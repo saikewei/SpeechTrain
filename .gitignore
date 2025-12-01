@@ -1,0 +1,14 @@
+node_modules
+dist
+out
+.DS_Store
+.eslintcache
+*.log*
+.vscode
+native_module/node_modules
+native_module/build
+native_module/bin
+native_module/libs
+resources/bin
+resources/espeak-ng-data
+resources/models
