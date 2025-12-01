@@ -14,6 +14,8 @@ interface SpeechEngineInstance {
   analyze(wavPath: string, text: string): AnalysisResult
   // 重载2: 传 PCM 内存数据
   analyze(pcmData: Float32Array, sampleRate: number, channels: number, text: string): AnalysisResult
+  phonemize(text: string): string
+  setLanguage(lang: string): void
 }
 
 // 定义返回结果的类型 (根据你的 C++ 结构)
@@ -119,6 +121,33 @@ class SpeechService {
     } catch (e) {
       console.error('[SpeechService] C++ Raw Error:', e)
       throw new Error('Raw Analysis failed inside native module.')
+    }
+  }
+
+  public phonemize(text: string): string {
+    if (!this.engine) {
+      throw new Error('Speech Engine is not ready.')
+    }
+
+    try {
+      const result = this.engine.phonemize(text) // 使用 any 绕过类型检查
+      return result
+    } catch (e) {
+      console.error('[SpeechService] C++ Phonemize Error:', e)
+      throw new Error('Phonemization failed inside native module.')
+    }
+  }
+
+  public setLanguage(lang: string): void {
+    if (!this.engine) {
+      throw new Error('Speech Engine is not ready.')
+    }
+
+    try {
+      this.engine.setLanguage(lang)
+    } catch (e) {
+      console.error('[SpeechService] C++ SetLanguage Error:', e)
+      throw new Error('Setting language failed inside native module.')
     }
   }
 }

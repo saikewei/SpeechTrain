@@ -32,7 +32,10 @@ public:
     static Napi::Object Init(Napi::Env env, Napi::Object exports)
     {
         Napi::Function func = DefineClass(env, "SpeechEngine", {// 定义暴露给 JS 的方法名和对应的 C++ 函数
-                                                                InstanceMethod("analyze", &SpeechEngine::Analyze)});
+                                                                InstanceMethod("analyze", &SpeechEngine::Analyze),
+                                                                InstanceMethod("phonemize", &SpeechEngine::Phonemize),
+                                                                InstanceMethod("setLanguage", &SpeechEngine::SetLanguage),
+                                                                });
 
         Napi::FunctionReference *constructor = new Napi::FunctionReference();
         *constructor = Napi::Persistent(func);
@@ -182,7 +185,7 @@ private:
             return env.Null();
         }
 
-        // 5. 构造 JS 返回对象 (代码与之前一致，省略部分重复代码以节省篇幅)
+        // 5. 构造 JS 返回对象
         Napi::Object resultObj = Napi::Object::New(env);
         Napi::Array wordsArr = Napi::Array::New(env, ws.size());
         float total_score_sum = 0.0f;
@@ -222,6 +225,39 @@ private:
         resultObj.Set("overall_score", overall);
 
         return resultObj;
+    }
+    Napi::Value Phonemize(const Napi::CallbackInfo &info)
+    {
+        Napi::Env env = info.Env();
+
+        if (info.Length() < 1 || !info[0].IsString())
+        {
+            Napi::TypeError::New(env, "Expected a string argument").ThrowAsJavaScriptException();
+            return env.Null();
+        }
+
+        std::string text = info[0].As<Napi::String>();
+        std::string phones = phonemizer_->convertToIPA(text);
+        return Napi::String::New(env, phones);
+    }
+    Napi::Value SetLanguage(const Napi::CallbackInfo &info)
+    {
+        Napi::Env env = info.Env();
+
+        if (info.Length() < 1 || !info[0].IsString())
+        {
+            Napi::TypeError::New(env, "Expected a string argument").ThrowAsJavaScriptException();
+            return env.Null();
+        }
+
+        std::string lang = info[0].As<Napi::String>();
+        bool success = phonemizer_->setVoice(lang);
+        if (!success)
+        {
+            Napi::Error::New(env, "Failed to set language/voice").ThrowAsJavaScriptException();
+            return env.Null();
+        }
+        return env.Undefined();
     }
 };
 

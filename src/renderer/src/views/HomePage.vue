@@ -5,15 +5,32 @@ import { useRouter } from 'vue-router'
 const router = useRouter()
 
 // 模拟数据：支持的语种
-const languages = ['English', 'Japanese', 'Chinese']
-const currentLang = ref('English')
+const languages = ['英语', '法语', '德语', '西班牙语']
+const currentLang = ref('英语')
 
 // 模拟数据：课程列表
 const courses = [
-  { id: 1, title: '日常问候', lang: 'English', level: 'Easy', count: 10, icon: '👋' },
-  { id: 2, title: '商务会议', lang: 'English', level: 'Hard', count: 15, icon: '💼' },
-  { id: 3, title: '旅行用语', lang: 'Japanese', level: 'Medium', count: 8, icon: '✈️' },
-  { id: 4, title: '古诗词', lang: 'Chinese', level: 'Hard', count: 5, icon: '📜' }
+  // --- 英语课程 ---
+  { id: 1, title: '基础单词练习', lang: '英语', level: 'Easy', count: 20, icon: '🍎' },
+  { id: 2, title: '进阶词汇挑战', lang: '英语', level: 'Medium', count: 30, icon: '🚀' },
+  { id: 3, title: '日常口语对话', lang: '英语', level: 'Easy', count: 15, icon: '🗣️' },
+  { id: 4, title: '商务英语长难句', lang: '英语', level: 'Hard', count: 10, icon: '💼' },
+  { id: 5, title: '经典电影台词', lang: '英语', level: 'Medium', count: 12, icon: '🎬' },
+
+  // --- 法语课程 ---
+  { id: 6, title: '基础单词练习', lang: '法语', level: 'Easy', count: 15, icon: '🥐' },
+  { id: 7, title: '旅行必备短语', lang: '法语', level: 'Medium', count: 25, icon: '✈️' },
+  { id: 8, title: '浪漫诗歌朗读', lang: '法语', level: 'Hard', count: 8, icon: '🌹' },
+
+  // --- 德语课程 ---
+  { id: 9, title: '基础单词练习', lang: '德语', level: 'Easy', count: 20, icon: '🍺' },
+  { id: 10, title: '科技与工程词汇', lang: '德语', level: 'Hard', count: 15, icon: '⚙️' },
+  { id: 11, title: '日常问候语', lang: '德语', level: 'Easy', count: 10, icon: '👋' },
+
+  // --- 西班牙语课程 ---
+  { id: 12, title: '基础单词练习', lang: '西班牙语', level: 'Easy', count: 20, icon: '💃' },
+  { id: 13, title: '常用生活俚语', lang: '西班牙语', level: 'Medium', count: 18, icon: '🌮' },
+  { id: 14, title: '足球解说金句', lang: '西班牙语', level: 'Hard', count: 12, icon: '⚽' }
 ]
 
 // 根据选择的语种过滤课程
@@ -114,7 +131,7 @@ const startPractice = (courseId: number): void => {
   gap: 20px;
 }
 .course-card {
-  background: rgb(0, 102, 255);
+  background: rgba(0, 255, 170, 0.573);
   border-radius: 12px;
   padding: 20px;
   display: flex;

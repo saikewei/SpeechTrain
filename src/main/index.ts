@@ -37,33 +37,6 @@ function createWindow(): void {
   }
 }
 
-// --- 测试函数：模拟调用 ---
-function runSelfTest(): void {
-  console.log('\n====== Starting Self-Test for C++ Interface ======')
-
-  // 动态获取 resources 目录路径
-  // 开发环境: 项目根目录/resources
-  // 生产环境: resources 目录 (process.resourcesPath)
-  const resourcePath = app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources')
-
-  const testWavPath = join(resourcePath, 'test.wav')
-  const testText = 'are the people available'
-
-  try {
-    console.log(`Calling analyze... Audio: ${testWavPath}`)
-    const result = speechService.analyze(testWavPath, testText)
-
-    console.log('Call successful! C++ returned result:')
-    console.log(JSON.stringify(result, null, 2))
-  } catch (error) {
-    console.log(
-      '⚠️ Exception caught during call (If due to missing WAV file, the link is working):'
-    )
-    console.error(error)
-  }
-  console.log('====== Self-Test Ended ======\n')
-}
-
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.

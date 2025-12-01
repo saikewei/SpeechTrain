@@ -48,6 +48,19 @@ std::string Phonemizer::removePunctuation(const std::string& text) {
     return result;
 }
 
+bool Phonemizer::setVoice(const std::string &voiceName)
+{
+    if (!initialized) return false;
+
+    if (espeak_SetVoiceByName(voiceName.c_str()) != EE_OK) {
+        std::cerr << "[Phonemizer Error] Failed to set voice: " << voiceName << std::endl;
+        return false;
+    }
+
+    std::cout << "[Phonemizer] Voice changed to: " << voiceName << std::endl;
+    return true;
+}
+
 std::string Phonemizer::rawEspeakCall(const std::string& text) {
     if (!initialized) return "";
 

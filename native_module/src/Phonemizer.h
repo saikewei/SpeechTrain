@@ -42,6 +42,7 @@ public:
     static std::string removePunctuation(const std::string& text);
 
     bool isInitialized() const { return initialized; }
+    bool setVoice(const std::string& voiceName);
 
     // 保留旧接口用于简单测试
     std::string convertToIPA(const std::string& text);
