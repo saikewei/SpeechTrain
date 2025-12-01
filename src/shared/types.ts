@@ -1,0 +1,19 @@
+export interface CourseContent {
+  text: string
+  translation?: string
+}
+
+export interface Course {
+  id: string | number
+  title: string
+  lang: string
+  level: string
+  icon: string
+  description?: string
+  content: CourseContent[]
+}
+
+// 列表页返回的简化版课程信息（不含 content）
+export interface CourseSummary extends Omit<Course, 'content'> {
+  count: number
+}

@@ -2,6 +2,7 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { loadCourses } from './courseService'
 
 app.commandLine.appendSwitch('no-sandbox')
 
@@ -53,6 +54,26 @@ app.whenReady().then(() => {
 
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
+
+  // 1. 获取课程列表 (只返回元数据，不返回具体 content 以减少流量)
+  ipcMain.handle('get-course-list', () => {
+    const allData = loadCourses()
+    // 只返回列表页需要的信息
+    return allData.map(({ id, title, lang, level, icon, content }) => ({
+      id,
+      title,
+      lang,
+      level,
+      icon,
+      count: content?.length || 0
+    }))
+  })
+
+  // 2. 获取单个课程的详细内容
+  ipcMain.handle('get-course-detail', (_event, courseId) => {
+    const allData = loadCourses()
+    return allData.find((c) => c.id === courseId)
+  })
 
   createWindow()
 

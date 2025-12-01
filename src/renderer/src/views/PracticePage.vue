@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import type { Course, CourseContent } from '../../../shared/types'
 
 const router = useRouter()
 
@@ -8,10 +9,27 @@ const router = useRouter()
 type State = 'idle' | 'recording' | 'analyzing' | 'result'
 const currentState = ref<State>('idle')
 
-// 模拟当前练习的句子
-const currentSentence = ref({
-  text: 'Hello world, welcome to the speech trainer.',
-  phonetic: '/həˈloʊ wɜːrld, ˈwɛlkəm tu ðə spiːtʃ ˈtreɪnər/'
+const isLoading = ref(true)
+const course = ref<Course | undefined>(undefined)
+const currentSentence = ref<CourseContent | undefined>(undefined)
+const currentIndex = ref(0)
+
+onMounted(async () => {
+  try {
+    isLoading.value = true
+    const courseId = router.currentRoute.value.params.id as string
+    // 调用 preload 中暴露的 API 获取课程详情
+    course.value = await window.api.getCourseDetail(courseId)
+    if (!course.value) {
+      console.error('Course not found:', courseId)
+      return
+    }
+    currentSentence.value = course.value.content[0]
+  } catch (error) {
+    console.error('Failed to load practice data:', error)
+  } finally {
+    isLoading.value = false
+  }
 })
 
 // 模拟评分结果结构
@@ -38,7 +56,7 @@ const toggleRecord = (): void => {
 const simulateAnalysis = (): void => {
   setTimeout(() => {
     // 模拟后端返回的数据
-    const words = currentSentence.value.text.split(' ')
+    const words = currentSentence.value?.text.split(' ') || []
     const mockResult = words.map((w) => ({
       word: w,
       score: Math.floor(Math.random() * 40) + 60, // 随机 60-100 分
@@ -55,7 +73,14 @@ const simulateAnalysis = (): void => {
 }
 
 const nextSentence = (): void => {
-  // 重置状态，加载下一句 (这里仅重置)
+  if (!course.value) return
+  currentIndex.value += 1
+  if (currentIndex.value >= course.value.content.length) {
+    // 课程结束，返回首页
+    router.push('/')
+    return
+  }
+  currentSentence.value = course.value.content[currentIndex.value]
   currentState.value = 'idle'
   resultWords.value = []
 }
@@ -87,9 +112,7 @@ const nextSentence = (): void => {
         </div>
 
         <!-- 普通模式下：显示纯文本 -->
-        <h2 v-else>{{ currentSentence.text }}</h2>
-
-        <p class="phonetic">{{ currentSentence.phonetic }}</p>
+        <h2 v-else>{{ currentSentence?.text }}</h2>
       </div>
 
       <!-- 2. 评分反馈圆环 (仅在结果页显示) -->

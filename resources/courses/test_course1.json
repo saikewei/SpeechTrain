@@ -1,0 +1,346 @@
+[
+  {
+    "id": "en_basic_01",
+    "title": "基础单词练习",
+    "lang": "英语",
+    "level": "Easy",
+    "icon": "🍎",
+    "description": "适合初学者的常用单词，涵盖生活基础。",
+    "content": [
+      {
+        "text": "Apple",
+        "translation": "苹果"
+      },
+      {
+        "text": "Banana",
+        "translation": "香蕉"
+      },
+      {
+        "text": "Cat",
+        "translation": "猫"
+      },
+      {
+        "text": "Dog",
+        "translation": "狗"
+      },
+      {
+        "text": "Hello",
+        "translation": "你好"
+      }
+    ]
+  },
+  {
+    "id": "en_adv_vocab_01",
+    "title": "进阶词汇挑战",
+    "lang": "英语",
+    "level": "Medium",
+    "icon": "🚀",
+    "description": "提升你的词汇量，学习更高级的表达方式。",
+    "content": [
+      {
+        "text": "Serendipity",
+        "translation": "机缘巧合；意外发现珍宝的运气"
+      },
+      {
+        "text": "Ephemeral",
+        "translation": "短暂的；瞬息万变的"
+      },
+      {
+        "text": "Resilience",
+        "translation": "韧性；恢复力"
+      },
+      {
+        "text": "Ubiquitous",
+        "translation": "无所不在的"
+      },
+      {
+        "text": "Eloquent",
+        "translation": "雄辩的；有口才的"
+      }
+    ]
+  },
+  {
+    "id": "en_daily_01",
+    "title": "日常口语对话",
+    "lang": "英语",
+    "level": "Easy",
+    "icon": "🗣️",
+    "description": "最地道的日常交流短句，让你的口语更自然。",
+    "content": [
+      {
+        "text": "How are you doing today?",
+        "translation": "你今天过得怎么样？"
+      },
+      {
+        "text": "Could you please help me?",
+        "translation": "你能帮帮我吗？"
+      },
+      {
+        "text": "I would like a cup of coffee.",
+        "translation": "我想要一杯咖啡。"
+      },
+      {
+        "text": "Have a nice day!",
+        "translation": "祝你过得愉快！"
+      }
+    ]
+  },
+  {
+    "id": "en_business_01",
+    "title": "商务英语长难句",
+    "lang": "英语",
+    "level": "Hard",
+    "icon": "💼",
+    "description": "职场必备，挑战复杂的商务逻辑表达。",
+    "content": [
+      {
+        "text": "We need to leverage our core competencies to maximize ROI.",
+        "translation": "我们需要利用核心竞争力来最大化投资回报率。"
+      },
+      {
+        "text": "Let's touch base later this week to finalize the proposal.",
+        "translation": "我们本周晚些时候联系一下，敲定提案。"
+      },
+      {
+        "text": "The stakeholder feedback indicates a need for a paradigm shift.",
+        "translation": "利益相关者的反馈表明需要进行范式转变。"
+      }
+    ]
+  },
+  {
+    "id": "en_movie_01",
+    "title": "经典电影台词",
+    "lang": "英语",
+    "level": "Medium",
+    "icon": "🎬",
+    "description": "跟着电影学英语，模仿经典角色的语气。",
+    "content": [
+      {
+        "text": "I'm going to make him an offer he can't refuse.",
+        "translation": "我会给他开出一个他无法拒绝的条件。（教父）"
+      },
+      {
+        "text": "May the Force be with you.",
+        "translation": "愿原力与你同在。（星球大战）"
+      },
+      {
+        "text": "Life is like a box of chocolates.",
+        "translation": "生活就像一盒巧克力。（阿甘正传）"
+      }
+    ]
+  },
+  {
+    "id": "fr_basic_01",
+    "title": "基础单词练习",
+    "lang": "法语",
+    "level": "Easy",
+    "icon": "🥐",
+    "description": "法语入门基础词汇。",
+    "content": [
+      {
+        "text": "Bonjour",
+        "translation": "你好"
+      },
+      {
+        "text": "Merci",
+        "translation": "谢谢"
+      },
+      {
+        "text": "Amour",
+        "translation": "爱"
+      },
+      {
+        "text": "Croissant",
+        "translation": "羊角面包"
+      },
+      {
+        "text": "Au revoir",
+        "translation": "再见"
+      }
+    ]
+  },
+  {
+    "id": "fr_travel_01",
+    "title": "旅行必备短语",
+    "lang": "法语",
+    "level": "Medium",
+    "icon": "✈️",
+    "description": "去法国旅游时最常用的问路和点餐句子。",
+    "content": [
+      {
+        "text": "Je voudrais un billet pour Paris.",
+        "translation": "我想要一张去巴黎的票。"
+      },
+      {
+        "text": "Où est la tour Eiffel ?",
+        "translation": "埃菲尔铁塔在哪里？"
+      },
+      {
+        "text": "L'addition, s'il vous plaît.",
+        "translation": "请结账。"
+      }
+    ]
+  },
+  {
+    "id": "fr_poetry_01",
+    "title": "浪漫诗歌朗读",
+    "lang": "法语",
+    "level": "Hard",
+    "icon": "🌹",
+    "description": "感受法语的韵律之美，朗读经典诗句。",
+    "content": [
+      {
+        "text": "Le ciel est par-dessus le toit, si bleu, si calme.",
+        "translation": "天空在屋顶之上，那么蓝，那么静。"
+      },
+      {
+        "text": "Demain, dès l'aube, à l'heure où blanchit la campagne.",
+        "translation": "明日，破晓时分，当田野微白之时。"
+      }
+    ]
+  },
+  {
+    "id": "de_basic_01",
+    "title": "基础单词练习",
+    "lang": "德语",
+    "level": "Easy",
+    "icon": "🍺",
+    "description": "德语入门核心词汇。",
+    "content": [
+      {
+        "text": "Hallo",
+        "translation": "你好"
+      },
+      {
+        "text": "Danke",
+        "translation": "谢谢"
+      },
+      {
+        "text": "Bier",
+        "translation": "啤酒"
+      },
+      {
+        "text": "Auto",
+        "translation": "汽车"
+      },
+      {
+        "text": "Nein",
+        "translation": "不"
+      }
+    ]
+  },
+  {
+    "id": "de_tech_01",
+    "title": "科技与工程词汇",
+    "lang": "德语",
+    "level": "Hard",
+    "icon": "⚙️",
+    "description": "严谨的德语科技词汇。",
+    "content": [
+      {
+        "text": "Geschwindigkeit",
+        "translation": "速度"
+      },
+      {
+        "text": "Naturwissenschaft",
+        "translation": "自然科学"
+      },
+      {
+        "text": "Kraftfahrzeug",
+        "translation": "机动车辆"
+      }
+    ]
+  },
+  {
+    "id": "de_greet_01",
+    "title": "日常问候语",
+    "lang": "德语",
+    "level": "Easy",
+    "icon": "👋",
+    "description": "像德国人一样打招呼。",
+    "content": [
+      {
+        "text": "Guten Morgen!",
+        "translation": "早上好！"
+      },
+      {
+        "text": "Wie geht es dir?",
+        "translation": "你好吗？"
+      },
+      {
+        "text": "Auf Wiedersehen!",
+        "translation": "再见！"
+      }
+    ]
+  },
+  {
+    "id": "es_basic_01",
+    "title": "基础单词练习",
+    "lang": "西班牙语",
+    "level": "Easy",
+    "icon": "💃",
+    "description": "西班牙语入门基础。",
+    "content": [
+      {
+        "text": "Hola",
+        "translation": "你好"
+      },
+      {
+        "text": "Amigo",
+        "translation": "朋友"
+      },
+      {
+        "text": "Fiesta",
+        "translation": "派对"
+      },
+      {
+        "text": "Gracias",
+        "translation": "谢谢"
+      }
+    ]
+  },
+  {
+    "id": "es_slang_01",
+    "title": "常用生活俚语",
+    "lang": "西班牙语",
+    "level": "Medium",
+    "icon": "🌮",
+    "description": "书本上学不到的街头西语。",
+    "content": [
+      {
+        "text": "Qué pasa?",
+        "translation": "怎么了？/ 发生什么事了？"
+      },
+      {
+        "text": "No hay problema.",
+        "translation": "没问题。"
+      },
+      {
+        "text": "Me gusta mucho.",
+        "translation": "我很喜欢。"
+      }
+    ]
+  },
+  {
+    "id": "es_soccer_01",
+    "title": "足球解说金句",
+    "lang": "西班牙语",
+    "level": "Hard",
+    "icon": "⚽",
+    "description": "充满激情的足球解说词。",
+    "content": [
+      {
+        "text": "Golazo!",
+        "translation": "世界波！/ 精彩进球！"
+      },
+      {
+        "text": "El partido está muy reñido.",
+        "translation": "比赛非常激烈。"
+      },
+      {
+        "text": "¡Qué parada del portero!",
+        "translation": "门将精彩的扑救！"
+      }
+    ]
+  }
+]

@@ -1,45 +1,51 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import type { CourseSummary } from '../../../shared/types'
 
 const router = useRouter()
 
-// 模拟数据：支持的语种
-const languages = ['英语', '法语', '德语', '西班牙语']
+// 状态：课程列表 (初始为空)
+const courses = ref<CourseSummary[]>([])
 const currentLang = ref('英语')
+const isLoading = ref(true)
 
-// 模拟数据：课程列表
-const courses = [
-  // --- 英语课程 ---
-  { id: 1, title: '基础单词练习', lang: '英语', level: 'Easy', count: 20, icon: '🍎' },
-  { id: 2, title: '进阶词汇挑战', lang: '英语', level: 'Medium', count: 30, icon: '🚀' },
-  { id: 3, title: '日常口语对话', lang: '英语', level: 'Easy', count: 15, icon: '🗣️' },
-  { id: 4, title: '商务英语长难句', lang: '英语', level: 'Hard', count: 10, icon: '💼' },
-  { id: 5, title: '经典电影台词', lang: '英语', level: 'Medium', count: 12, icon: '🎬' },
+// 计算属性：从已加载的课程中动态提取语种列表
+const languages = computed(() => {
+  const langs = new Set(courses.value.map((c) => c.lang))
+  // 如果还没加载到数据，显示默认列表，避免界面塌陷
+  if (langs.size === 0) return ['英语']
+  return Array.from(langs)
+})
 
-  // --- 法语课程 ---
-  { id: 6, title: '基础单词练习', lang: '法语', level: 'Easy', count: 15, icon: '🥐' },
-  { id: 7, title: '旅行必备短语', lang: '法语', level: 'Medium', count: 25, icon: '✈️' },
-  { id: 8, title: '浪漫诗歌朗读', lang: '法语', level: 'Hard', count: 8, icon: '🌹' },
+// 生命周期：组件挂载时调用后端接口
+onMounted(async () => {
+  try {
+    isLoading.value = true
+    // 调用 preload 中暴露的 API
+    const data = await window.api.getCourseList()
+    courses.value = data
 
-  // --- 德语课程 ---
-  { id: 9, title: '基础单词练习', lang: '德语', level: 'Easy', count: 20, icon: '🍺' },
-  { id: 10, title: '科技与工程词汇', lang: '德语', level: 'Hard', count: 15, icon: '⚙️' },
-  { id: 11, title: '日常问候语', lang: '德语', level: 'Easy', count: 10, icon: '👋' },
-
-  // --- 西班牙语课程 ---
-  { id: 12, title: '基础单词练习', lang: '西班牙语', level: 'Easy', count: 20, icon: '💃' },
-  { id: 13, title: '常用生活俚语', lang: '西班牙语', level: 'Medium', count: 18, icon: '🌮' },
-  { id: 14, title: '足球解说金句', lang: '西班牙语', level: 'Hard', count: 12, icon: '⚽' }
-]
+    // 智能切换语种：如果当前选中的语种不在列表中，自动切换到第一个可用的语种
+    if (data.length > 0) {
+      const availableLangs = new Set(data.map((c) => c.lang))
+      if (!availableLangs.has(currentLang.value)) {
+        currentLang.value = data[0].lang
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load courses:', error)
+  } finally {
+    isLoading.value = false
+  }
+})
 
 // 根据选择的语种过滤课程
 const filteredCourses = computed(() => {
-  return courses.filter((c) => c.lang === currentLang.value)
+  return courses.value.filter((c) => c.lang === currentLang.value)
 })
 
-const startPractice = (courseId: number): void => {
-  // 跳转到练习页，并带上课程ID
+const startPractice = (courseId: string | number): void => {
   router.push(`/practice/${courseId}`)
 }
 </script>
@@ -63,8 +69,11 @@ const startPractice = (courseId: number): void => {
       </button>
     </div>
 
+    <!-- 加载中提示 -->
+    <div v-if="isLoading" class="loading-state">加载课程中...</div>
+
     <!-- 课程卡片网格 -->
-    <div class="course-grid">
+    <div v-else class="course-grid">
       <div
         v-for="course in filteredCourses"
         :key="course.id"
@@ -80,6 +89,11 @@ const startPractice = (courseId: number): void => {
           </div>
         </div>
         <div class="play-icon">▶</div>
+      </div>
+
+      <!-- 空状态提示 -->
+      <div v-if="filteredCourses.length === 0" class="empty-state">
+        <p>暂无该语种的课程</p>
       </div>
     </div>
   </div>
@@ -108,6 +122,7 @@ const startPractice = (courseId: number): void => {
   display: flex;
   gap: 10px;
   margin-bottom: 30px;
+  flex-wrap: wrap;
 }
 .tab-btn {
   padding: 8px 20px;
@@ -131,7 +146,7 @@ const startPractice = (courseId: number): void => {
   gap: 20px;
 }
 .course-card {
-  background: rgba(0, 255, 170, 0.573);
+  background: white;
   border-radius: 12px;
   padding: 20px;
   display: flex;
@@ -174,5 +189,13 @@ const startPractice = (courseId: number): void => {
 }
 .course-card:hover .play-icon {
   opacity: 1;
+}
+
+.loading-state,
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: #999;
+  grid-column: 1 / -1;
 }
 </style>
