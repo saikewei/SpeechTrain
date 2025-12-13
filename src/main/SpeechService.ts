@@ -1,6 +1,7 @@
 import { app } from 'electron'
 import path from 'path'
 import { createRequire } from 'node:module'
+import type { AnalysisResult } from '../shared/types'
 
 const require = createRequire(import.meta.url)
 
@@ -16,16 +17,6 @@ interface SpeechEngineInstance {
   analyze(pcmData: Float32Array, sampleRate: number, channels: number, text: string): AnalysisResult
   phonemize(text: string): string
   setLanguage(lang: string): void
-}
-
-// 定义返回结果的类型 (根据你的 C++ 结构)
-export interface AnalysisResult {
-  overall_score: number
-  words: Array<{
-    word: string
-    score: number
-    phonemes: Array<{ ipa: string; score: number; is_good: boolean }>
-  }>
 }
 
 class SpeechService {

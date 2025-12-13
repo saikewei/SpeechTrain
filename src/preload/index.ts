@@ -4,7 +4,11 @@ import { electronAPI } from '@electron-toolkit/preload'
 // Custom APIs for renderer
 const api = {
   getCourseList: () => ipcRenderer.invoke('get-course-list'),
-  getCourseDetail: (id: string) => ipcRenderer.invoke('get-course-detail', id)
+  getCourseDetail: (id: string) => ipcRenderer.invoke('get-course-detail', id),
+  phonemize: (text: string) => ipcRenderer.invoke('phonemize', text),
+  setEspeakLanguage: (lang: string) => ipcRenderer.invoke('set-espeak-language', lang),
+  analyzeRawAudio: (pcmData: Float32Array, text: string) =>
+    ipcRenderer.invoke('analyze-raw-audio', pcmData, text)
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

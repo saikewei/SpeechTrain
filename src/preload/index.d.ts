@@ -1,5 +1,6 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import { Course, CourseSummary } from '../shared/types'
+import { AnalysisResult } from '../shared/types'
 
 declare global {
   interface Window {
@@ -9,6 +10,13 @@ declare global {
       getCourseList: () => Promise<CourseSummary[]>
       // 详情返回的是完整课程对象
       getCourseDetail: (id: string) => Promise<Course | undefined>
+
+      // 音素化
+      phonemize: (text: string) => Promise<string>
+      // 设置语言
+      setEspeakLanguage: (lang: string) => Promise<void>
+      // 分析音频
+      analyzeRawAudio: (pcmData: Float32Array, text: string) => Promise<AnalysisResult>
     }
   }
 }

@@ -107,7 +107,7 @@ app.whenReady().then(async () => {
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
 
-  // 1. 获取课程列表 (只返回元数据，不返回具体 content 以减少流量)
+  // 获取课程列表 (只返回元数据，不返回具体 content 以减少流量)
   ipcMain.handle('get-course-list', () => {
     const allData = loadCourses()
     // 只返回列表页需要的信息
@@ -121,10 +121,49 @@ app.whenReady().then(async () => {
     }))
   })
 
-  // 2. 获取单个课程的详细内容
+  // 获取单个课程的详细内容
   ipcMain.handle('get-course-detail', (_event, courseId) => {
     const allData = loadCourses()
     return allData.find((c) => c.id === courseId)
+  })
+
+  // 音素化
+  ipcMain.handle('phonemize', (_event, text: string) => {
+    return speechService.phonemize(text)
+  })
+
+  // 设置语言
+  ipcMain.handle('set-espeak-language', (_event, lang: string) => {
+    switch (lang) {
+      case '英语':
+        lang = 'en-us'
+        break
+      case '中文':
+        lang = 'zh'
+        break
+      case '日语':
+        lang = 'ja'
+        break
+      case '法语':
+        lang = 'fr'
+        break
+      case '德语':
+        lang = 'de'
+        break
+      case '西班牙语':
+        lang = 'es'
+        break
+      default:
+        lang = 'en-us'
+    }
+    console.log(`[Main] Setting eSpeak language to: ${lang}`)
+    speechService.setLanguage(lang)
+  })
+
+  // 分析音频数据 (高性能方式)
+  ipcMain.handle('analyze-raw-audio', (_event, pcmData: Float32Array, text: string) => {
+    const result = speechService.analyzeRaw(pcmData, 16000, 1, text)
+    return result
   })
 
   createWindow()

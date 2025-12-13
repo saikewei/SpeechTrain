@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import type { Course, CourseContent } from '../../../shared/types'
+import type { Course, CourseContent, AnalysisResult } from '../../../shared/types'
 
 const router = useRouter()
 
@@ -13,6 +13,7 @@ const isLoading = ref(true)
 const course = ref<Course | undefined>(undefined)
 const currentSentence = ref<CourseContent | undefined>(undefined)
 const currentIndex = ref(0)
+const currentPhonemes = ref<string>('')
 
 onMounted(async () => {
   try {
@@ -20,6 +21,9 @@ onMounted(async () => {
     const courseId = router.currentRoute.value.params.id as string
     // 调用 preload 中暴露的 API 获取课程详情
     course.value = await window.api.getCourseDetail(courseId)
+    window.api.setEspeakLanguage(course.value?.lang || 'en')
+    currentPhonemes.value = await window.api.phonemize(course.value?.content[0].text || '')
+    console.log('Phonemes:', currentPhonemes.value)
     if (!course.value) {
       console.error('Course not found:', courseId)
       return
@@ -32,44 +36,111 @@ onMounted(async () => {
   }
 })
 
-// 模拟评分结果结构
-interface WordScore {
-  word: string
-  score: number // 0-100
-  isGood: boolean
-}
-const resultScore = ref(0)
-const resultWords = ref<WordScore[]>([])
+onUnmounted(() => {
+  if (currentState.value === 'recording') {
+    stopRecording()
+  }
+})
 
-// --- 模拟逻辑 (未来替换为真实 API) ---
-const toggleRecord = (): void => {
-  if (currentState.value === 'idle') {
-    // 开始录音
+// --- 录音相关变量 ---
+let audioContext: AudioContext | null = null
+let mediaStream: MediaStream | null = null
+let scriptProcessor: ScriptProcessorNode | null = null
+let audioInput: MediaStreamAudioSourceNode | null = null
+const recordedChunks: Float32Array[] = [] // 暂存录音片段
+
+// 开始录音
+const startRecording = async (): Promise<void> => {
+  try {
+    // 1. 获取麦克风权限
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    // 2. 创建 AudioContext
+    audioContext = new window.AudioContext({ sampleRate: 16000 })
+    // 3. 创建源节点
+    audioInput = audioContext.createMediaStreamSource(mediaStream)
+    // 4. 创建处理节点 (缓冲区大小 4096)
+    // ScriptProcessorNode 虽然被标记为废弃，但在 Electron 环境下依然稳定且简单
+    scriptProcessor = audioContext.createScriptProcessor(4096, 1, 1)
+    // 5. 监听音频处理事件
+    scriptProcessor.onaudioprocess = (event) => {
+      if (currentState.value !== 'recording') return
+      const inputBuffer = event.inputBuffer
+      const inputData = inputBuffer.getChannelData(0) // 获取单声道数据
+      // 复制一份数据存起来 (Float32Array)
+      recordedChunks.push(new Float32Array(inputData))
+    }
+    // 6. 连接节点: Source -> Processor -> Destination
+    audioInput.connect(scriptProcessor)
+    scriptProcessor.connect(audioContext.destination)
+    // 清空旧数据
+    recordedChunks.length = 0
     currentState.value = 'recording'
-  } else if (currentState.value === 'recording') {
-    // 停止录音并分析
-    currentState.value = 'analyzing'
-    simulateAnalysis()
+  } catch (err) {
+    console.error('无法启动录音:', err)
+    alert('无法访问麦克风，请检查权限设置。')
   }
 }
 
-const simulateAnalysis = (): void => {
-  setTimeout(() => {
-    // 模拟后端返回的数据
-    const words = currentSentence.value?.text.split(' ') || []
-    const mockResult = words.map((w) => ({
-      word: w,
-      score: Math.floor(Math.random() * 40) + 60, // 随机 60-100 分
-      isGood: Math.random() > 0.3 // 70% 概率读得好
-    }))
+// 停止录音并合并数据
+const stopRecording = async (): Promise<void> => {
+  if (currentState.value !== 'recording') return
+  // 1. 停止处理
+  if (scriptProcessor) {
+    scriptProcessor.disconnect()
+    scriptProcessor = null
+  }
+  if (audioInput) {
+    audioInput.disconnect()
+    audioInput = null
+  }
+  if (mediaStream) {
+    mediaStream.getTracks().forEach((track) => track.stop())
+    mediaStream = null
+  }
+  if (audioContext) {
+    await audioContext.close()
+    audioContext = null
+  }
+  currentState.value = 'analyzing'
+  // 2. 合并所有片段为一个大的 Float32Array
+  const totalLength = recordedChunks.reduce((acc, chunk) => acc + chunk.length, 0)
+  const fullAudioData = new Float32Array(totalLength)
+  let offset = 0
+  for (const chunk of recordedChunks) {
+    fullAudioData.set(chunk, offset)
+    offset += chunk.length
+  }
 
-    // 计算总分
-    const total = mockResult.reduce((acc, cur) => acc + cur.score, 0) / mockResult.length
+  console.log('录音数据长度:', fullAudioData.length)
+  console.log(fullAudioData)
+  // 3. 发送给后端分析
+  analyzeAudio(fullAudioData)
+}
 
-    resultScore.value = Math.round(total)
-    resultWords.value = mockResult
+const result = ref<AnalysisResult | null>(null)
+
+// 调用后端 API
+const analyzeAudio = async (pcmData: Float32Array): Promise<void> => {
+  try {
+    if (!currentSentence.value) return
+
+    result.value = await window.api.analyzeRawAudio(pcmData, currentSentence.value.text)
     currentState.value = 'result'
-  }, 1500) // 假装分析了 1.5秒
+
+    console.log('分析结果:', result.value)
+  } catch (error) {
+    console.error('分析失败:', error)
+    alert('分析失败，请重试')
+    currentState.value = 'idle'
+  }
+}
+
+const toggleRecord = (): void => {
+  if (currentState.value === 'idle') {
+    startRecording()
+  } else if (currentState.value === 'recording') {
+    stopRecording()
+  }
 }
 
 const nextSentence = (): void => {
@@ -82,7 +153,8 @@ const nextSentence = (): void => {
   }
   currentSentence.value = course.value.content[currentIndex.value]
   currentState.value = 'idle'
-  resultWords.value = []
+  recordedChunks.length = 0
+  result.value = null
 }
 </script>
 
@@ -91,7 +163,7 @@ const nextSentence = (): void => {
     <!-- 顶部导航 -->
     <div class="top-bar">
       <button class="back-btn" @click="router.back()">← 退出</button>
-      <div class="progress">Lesson 1: 3/10</div>
+      <div class="progress">Lesson 1: {{ currentIndex + 1 }}/{{ course?.content.length }}</div>
     </div>
 
     <!-- 主要内容区 -->
@@ -99,25 +171,18 @@ const nextSentence = (): void => {
       <!-- 1. 句子展示区 -->
       <div class="sentence-card">
         <!-- 结果模式下：显示彩色单词 -->
-        <div v-if="currentState === 'result'" class="result-text">
-          <span
-            v-for="(item, index) in resultWords"
-            :key="index"
-            :class="['word', item.isGood ? 'good' : 'bad']"
-          >
-            {{ item.word }}
-            <!-- 悬浮显示分数 -->
-            <span class="score-tooltip">{{ item.score }}</span>
-          </span>
-        </div>
+        <div v-if="currentState === 'result'" class="result-text"></div>
 
         <!-- 普通模式下：显示纯文本 -->
-        <h2 v-else>{{ currentSentence?.text }}</h2>
+        <div v-else>
+          <h2 class="main-text">{{ currentSentence?.text }}</h2>
+          <div class="phonetic">{{ currentPhonemes }}</div>
+        </div>
       </div>
 
       <!-- 2. 评分反馈圆环 (仅在结果页显示) -->
       <div v-if="currentState === 'result'" class="score-circle">
-        <div class="score-number">{{ resultScore }}</div>
+        <div class="score-number">{{ result ? result.overall_score : '' }}</div>
         <div class="score-label">总分</div>
       </div>
 
@@ -137,8 +202,8 @@ const nextSentence = (): void => {
         v-if="currentState !== 'result'"
         class="mic-btn"
         :class="{ recording: currentState === 'recording', disabled: currentState === 'analyzing' }"
-        @click="toggleRecord"
         :disabled="currentState === 'analyzing'"
+        @click="toggleRecord"
       >
         <span class="mic-icon">🎙️</span>
       </button>
@@ -154,6 +219,11 @@ const nextSentence = (): void => {
   display: flex;
   flex-direction: column;
   background: #f8f9fa;
+  user-select: none;
+}
+
+.main-text {
+  user-select: text;
 }
 
 .top-bar {

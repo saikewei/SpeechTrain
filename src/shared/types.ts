@@ -17,3 +17,12 @@ export interface Course {
 export interface CourseSummary extends Omit<Course, 'content'> {
   count: number
 }
+
+export interface AnalysisResult {
+  overall_score: number
+  words: Array<{
+    word: string
+    score: number
+    phonemes: Array<{ ipa: string; score: number; is_good: boolean }>
+  }>
+}
