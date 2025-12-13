@@ -31,55 +31,63 @@ export interface AnalysisResult {
 class SpeechService {
   private engine: SpeechEngineInstance | null = null
 
+  private isInitialized = false
+
   constructor() {
-    this.init()
+    // this.init()
   }
 
-  private init(): void {
-    try {
-      // 1. 智能处理 C++ 插件的路径
-      // 开发环境: ../../resources/bin/SpeechNode.node (假设)
-      // 生产环境: ./bin/SpeechNode.node (取决于 electron-builder 配置)
-      let addonPath = ''
-      if (app.isPackaged) {
-        addonPath = path.join(process.resourcesPath, 'bin', 'speech_core.node')
-      } else {
-        // 这里填你开发环境编译出来的实际绝对路径，或者相对路径
-        // 注意：如果你更改了 C++ 项目名称，这里的文件名也要改
-        addonPath = path.join(__dirname, '..', '..', 'resources', 'bin', 'speech_core.node')
+  public async initialize(): Promise<void> {
+    if (this.isInitialized) return
+
+    console.log('[SpeechService] Starting initialization...')
+
+    // 模拟异步操作，避免阻塞 UI 线程 (虽然 require 是同步的，但我们可以把它放在 Promise 里)
+    // 在实际生产中，如果 C++ 初始化非常耗时，建议放到 Worker 线程，
+    // 但对于简单的加载，Promise.resolve().then 配合 Splash 窗口已经足够让 UI 不卡死。
+    await new Promise<void>((resolve, reject) => {
+      try {
+        // ... 原来的 init 代码逻辑 ...
+        // 1. 智能处理 C++ 插件的路径
+        let addonPath = ''
+        if (app.isPackaged) {
+          addonPath = path.join(process.resourcesPath, 'bin', 'speech_core.node')
+        } else {
+          addonPath = path.join(__dirname, '..', '..', 'resources', 'bin', 'speech_core.node')
+        }
+
+        console.log(`[SpeechService] Loading addon from: ${addonPath}`)
+        const NativeModule = require(addonPath) as { SpeechEngine: NativeAddon }
+
+        // 2. 智能处理资源路径
+        const resPath = app.isPackaged
+          ? process.resourcesPath
+          : path.join(app.getAppPath(), 'resources')
+
+        console.log('[SpeechService] Loading AI Models from:', resPath)
+
+        // 3. 实例化 C++ 对象
+        this.engine = new NativeModule.SpeechEngine(
+          path.join(resPath, 'models/wav2vec2.onnx'),
+          path.join(resPath, 'models/vocab.json'),
+          resPath
+        )
+
+        this.isInitialized = true
+        console.log('[SpeechService] Speech Engine initialized successfully.')
+        resolve()
+      } catch (e) {
+        console.error('[SpeechService] Failed to initialize Speech Engine:', e)
+        reject(e)
       }
-
-      console.log(`[SpeechService] Loading addon from: ${addonPath}`)
-
-      // 动态 require，并强制转换为类型
-      const NativeModule = require(addonPath) as { SpeechEngine: NativeAddon }
-
-      // 2. 智能处理资源路径
-      const resPath = app.isPackaged
-        ? process.resourcesPath
-        : path.join(app.getAppPath(), 'resources') // electron-vite 常用路径
-
-      console.log('[SpeechService] Loading AI Models from:', resPath)
-
-      // 3. 实例化 C++ 对象
-      this.engine = new NativeModule.SpeechEngine(
-        path.join(resPath, 'models/wav2vec2.onnx'),
-        path.join(resPath, 'models/vocab.json'),
-        resPath // espeak-ng-data 的父目录
-      )
-
-      console.log('[SpeechService] Speech Engine initialized successfully.')
-    } catch (e) {
-      console.error('[SpeechService] Failed to initialize Speech Engine:', e)
-      // 这里可以做降级处理，或者弹窗报错
-    }
+    })
   }
 
   /**
    * 通过文件路径分析 (传统方式)
    */
   public analyze(wavPath: string, text: string): AnalysisResult {
-    if (!this.engine) {
+    if (!this.isInitialized || !this.engine) {
       throw new Error('Speech Engine is not ready.')
     }
 
@@ -108,7 +116,7 @@ class SpeechService {
     channels: number,
     text: string
   ): AnalysisResult {
-    if (!this.engine) {
+    if (!this.isInitialized || !this.engine) {
       throw new Error('Speech Engine is not ready.')
     }
 
@@ -125,7 +133,7 @@ class SpeechService {
   }
 
   public phonemize(text: string): string {
-    if (!this.engine) {
+    if (!this.isInitialized || !this.engine) {
       throw new Error('Speech Engine is not ready.')
     }
 
@@ -139,7 +147,7 @@ class SpeechService {
   }
 
   public setLanguage(lang: string): void {
-    if (!this.engine) {
+    if (!this.isInitialized || !this.engine) {
       throw new Error('Speech Engine is not ready.')
     }
 

@@ -3,15 +3,49 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { loadCourses } from './courseService'
+import { speechService } from './SpeechService'
 
 app.commandLine.appendSwitch('no-sandbox')
+// 定义两个窗口变量
+let mainWindow: BrowserWindow | null = null
+let splashWindow: BrowserWindow | null = null
+
+function createSplashWindow(): void {
+  splashWindow = new BrowserWindow({
+    width: 500,
+    height: 300,
+    frame: false, // 无边框
+    alwaysOnTop: true,
+    transparent: true, // 如果你想做圆角或透明背景
+    resizable: false,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true
+    }
+  })
+
+  // 加载 splash.html
+  // 注意：你需要确保构建工具会把 splash.html 复制到输出目录
+  // 或者直接用 data url 加载简单的 HTML
+  if (is.dev) {
+    // 开发模式
+    splashWindow.loadFile(join(__dirname, '../../src/renderer/splash.html'))
+  } else {
+    // 生产模式
+    splashWindow.loadFile(join(__dirname, '../renderer/splash.html'))
+  }
+
+  splashWindow.on('closed', () => {
+    splashWindow = null
+  })
+}
 
 function createWindow(): void {
   // Create the browser window.
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 900,
     height: 670,
-    show: false,
+    show: false, // 先隐藏，等准备好了再显示
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
@@ -21,7 +55,11 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
+    // 主窗口准备好后，显示主窗口，关闭 Splash
+    mainWindow?.show()
+    if (splashWindow) {
+      splashWindow.close()
+    }
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -41,7 +79,7 @@ function createWindow(): void {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
 
@@ -51,6 +89,20 @@ app.whenReady().then(() => {
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
+
+  createSplashWindow()
+
+  // 2. 异步初始化 AI 引擎 (耗时操作)
+  try {
+    // 稍微延迟一下，让 Splash 窗口有机会渲染出来
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    await speechService.initialize()
+  } catch (error) {
+    console.error('Failed to initialize AI engine:', error)
+    // 这里可以弹窗提示用户，然后退出
+  }
+
+  createWindow()
 
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))

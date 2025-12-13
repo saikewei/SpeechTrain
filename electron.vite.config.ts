@@ -15,6 +15,16 @@ export default defineConfig({
         '@renderer': resolve('src/renderer/src')
       }
     },
-    plugins: [vue()]
+    plugins: [vue()],
+    build: {
+      rollupOptions: {
+        input: {
+          // 主窗口入口
+          index: resolve(__dirname, 'src/renderer/index.html'),
+          // 启动画面入口 (必须添加这个，否则打包后文件会丢失)
+          splash: resolve(__dirname, 'src/renderer/splash.html')
+        }
+      }
+    }
   }
 })
