@@ -198,6 +198,30 @@ std::vector<std::string> Phonemizer::cleanAndTokenizeIPA(const std::string& raw_
 
             // 查表：如果这个子串在词表里
             if (vocab.find(sub) != vocab.end()) {
+                bool next_is_colon = false;
+                // 检查后两个字节是否是 0xCB 0x90
+                if (i + len + 1 < clean_str.length()) {
+                    unsigned char c1 = clean_str[i + len];
+                    unsigned char c2 = clean_str[i + len + 1];
+                    if (c1 == 0xCB && c2 == 0x90) {
+                        next_is_colon = true;
+                    }
+                }
+
+                bool current_ends_colon = false;
+                if (sub.length() >= 2) {
+                    unsigned char c1 = sub[sub.length() - 2];
+                    unsigned char c2 = sub[sub.length() - 1];
+                    if (c1 == 0xCB && c2 == 0x90) {
+                        current_ends_colon = true;
+                    }
+                }
+
+                // 如果后面是长音符，但当前词没把长音符包进去，这通常是个错误的切分
+                if (next_is_colon && !current_ends_colon) {
+                    continue; // 放弃当前长度，尝试更短的 len
+                }
+                
                 tokens.push_back(sub);
                 i += len; // 指针前进
                 match_found = true;
