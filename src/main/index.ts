@@ -43,8 +43,8 @@ function createSplashWindow(): void {
 function createWindow(): void {
   // Create the browser window.
   mainWindow = new BrowserWindow({
-    width: 900,
-    height: 670,
+    width: 1100,
+    height: 900,
     show: false, // 先隐藏，等准备好了再显示
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),

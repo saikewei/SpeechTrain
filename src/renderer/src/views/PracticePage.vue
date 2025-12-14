@@ -40,6 +40,9 @@ onUnmounted(() => {
   if (currentState.value === 'recording') {
     stopRecording()
   }
+  if (playbackAudioContext) {
+    stopPlayback()
+  }
 })
 
 // --- 录音相关变量 ---
@@ -48,6 +51,7 @@ let mediaStream: MediaStream | null = null
 let scriptProcessor: ScriptProcessorNode | null = null
 let audioInput: MediaStreamAudioSourceNode | null = null
 const recordedChunks: Float32Array[] = [] // 暂存录音片段
+let recordedAudioData: Float32Array | null = null // 保存完整录音数据
 
 // 开始录音
 const startRecording = async (): Promise<void> => {
@@ -111,6 +115,9 @@ const stopRecording = async (): Promise<void> => {
     offset += chunk.length
   }
 
+  // 保存录音数据用于播放
+  recordedAudioData = fullAudioData
+
   console.log('录音数据长度:', fullAudioData.length)
   console.log(fullAudioData)
   // 3. 发送给后端分析
@@ -152,9 +159,92 @@ const nextSentence = (): void => {
     return
   }
   currentSentence.value = course.value.content[currentIndex.value]
+  currentPhonemes.value = ''
+  window.api.phonemize(currentSentence.value.text).then((phonemes) => {
+    currentPhonemes.value = phonemes
+  })
   currentState.value = 'idle'
   recordedChunks.length = 0
   result.value = null
+  recordedAudioData = null
+  isPlayingRecording.value = false
+}
+
+const retry = (): void => {
+  currentState.value = 'idle'
+  recordedChunks.length = 0
+  result.value = null
+  recordedAudioData = null
+  isPlayingRecording.value = false
+}
+
+// 计算指数化后的得分
+const getDisplayScore = (score: number): number => {
+  return Math.round(Math.exp(score) * 100)
+}
+
+// 根据得分获取颜色等级
+const getScoreLevel = (score: number): 'good' | 'medium' | 'bad' => {
+  const displayScore = getDisplayScore(score)
+  if (displayScore >= 70) return 'good'
+  if (displayScore >= 40) return 'medium'
+  return 'bad'
+}
+
+// 播放录音相关
+const isPlayingRecording = ref(false)
+let playbackAudioContext: AudioContext | null = null
+
+const playRecording = async (): Promise<void> => {
+  if (!recordedAudioData || isPlayingRecording.value) return
+
+  try {
+    isPlayingRecording.value = true
+
+    // 创建新的 AudioContext 用于播放
+    playbackAudioContext = new AudioContext({ sampleRate: 16000 })
+
+    // 创建 AudioBuffer
+    const audioBuffer = playbackAudioContext.createBuffer(
+      1, // 单声道
+      recordedAudioData.length,
+      16000 // 采样率
+    )
+
+    // 将录音数据复制到 AudioBuffer
+    audioBuffer.copyToChannel(recordedAudioData as Float32Array<ArrayBuffer>, 0)
+
+    // 创建 BufferSource 并播放
+    const source = playbackAudioContext.createBufferSource()
+    source.buffer = audioBuffer
+    source.connect(playbackAudioContext.destination)
+
+    // 播放结束后重置状态
+    source.onended = () => {
+      isPlayingRecording.value = false
+      if (playbackAudioContext) {
+        playbackAudioContext.close()
+        playbackAudioContext = null
+      }
+    }
+
+    source.start(0)
+  } catch (error) {
+    console.error('播放录音失败:', error)
+    isPlayingRecording.value = false
+    if (playbackAudioContext) {
+      await playbackAudioContext.close()
+      playbackAudioContext = null
+    }
+  }
+}
+
+const stopPlayback = (): void => {
+  if (playbackAudioContext) {
+    playbackAudioContext.close()
+    playbackAudioContext = null
+  }
+  isPlayingRecording.value = false
 }
 </script>
 
@@ -170,8 +260,26 @@ const nextSentence = (): void => {
     <div class="content-area">
       <!-- 1. 句子展示区 -->
       <div class="sentence-card">
-        <!-- 结果模式下：显示彩色单词 -->
-        <div v-if="currentState === 'result'" class="result-text"></div>
+        <!-- 结果模式下：显示彩色单词和音素 -->
+        <div v-if="currentState === 'result'" class="result-text">
+          <div v-for="(wordData, idx) in result?.words" :key="idx" class="word-container">
+            <div class="word" :class="getScoreLevel(wordData.score)">
+              <span class="word-text">{{ wordData.word }}</span>
+              <div class="word-score">{{ getDisplayScore(wordData.score) }}</div>
+            </div>
+            <div class="phonemes">
+              <span
+                v-for="(phoneme, pIdx) in wordData.phonemes"
+                :key="pIdx"
+                class="phoneme"
+                :class="getScoreLevel(phoneme.score)"
+                :title="`得分: ${getDisplayScore(phoneme.score)}`"
+              >
+                {{ phoneme.ipa }}
+              </span>
+            </div>
+          </div>
+        </div>
 
         <!-- 普通模式下：显示纯文本 -->
         <div v-else>
@@ -181,8 +289,12 @@ const nextSentence = (): void => {
       </div>
 
       <!-- 2. 评分反馈圆环 (仅在结果页显示) -->
-      <div v-if="currentState === 'result'" class="score-circle">
-        <div class="score-number">{{ result ? result.overall_score : '' }}</div>
+      <div
+        v-if="currentState === 'result'"
+        class="score-circle"
+        :class="result ? getScoreLevel(result.overall_score) : ''"
+      >
+        <div class="score-number">{{ result ? getDisplayScore(result.overall_score) : 'N/A' }}</div>
         <div class="score-label">总分</div>
       </div>
 
@@ -207,8 +319,13 @@ const nextSentence = (): void => {
       >
         <span class="mic-icon">🎙️</span>
       </button>
-
-      <button v-else class="next-btn" @click="nextSentence">下一句 →</button>
+      <div v-else class="result-actions">
+        <button class="play-btn" :disabled="isPlayingRecording" @click="playRecording">
+          {{ isPlayingRecording ? '⏸️ 播放中...' : '▶️ 播放录音' }}
+        </button>
+        <button class="retry-btn" @click="retry">再来一次</button>
+        <button class="next-btn" @click="nextSentence">下一句 →</button>
+      </div>
     </div>
   </div>
 </template>
@@ -264,26 +381,93 @@ const nextSentence = (): void => {
 
 /* 结果单词样式 */
 .result-text {
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: bold;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 20px;
   justify-content: center;
+  align-items: flex-start;
 }
+
+.word-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
 .word {
   position: relative;
   cursor: default;
-  padding: 0 2px;
-  border-radius: 4px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #f0f0f0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
 }
+
 .word.good {
-  color: #27ae60;
+  background: #d4edda;
+  border: 2px solid #28a745;
 }
+
+.word.medium {
+  background: #fff3cd;
+  border: 2px solid #ffc107;
+}
+
 .word.bad {
-  color: #e74c3c;
-  text-decoration: underline;
-  text-decoration-style: wavy;
+  background: #f8d7da;
+  border: 2px solid #dc3545;
+}
+
+.word-text {
+  font-size: 1.5rem;
+}
+
+.word-score {
+  font-size: 0.9rem;
+  color: #666;
+  font-weight: normal;
+}
+
+.phonemes {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.phoneme {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-family: monospace;
+  background: #f0f0f0;
+  cursor: help;
+  transition: transform 0.2s;
+}
+
+.phoneme:hover {
+  transform: scale(1.1);
+}
+
+.phoneme.good {
+  background: #c3e6cb;
+  color: #155724;
+}
+
+.phoneme.medium {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.phoneme.bad {
+  background: #f5c6cb;
+  color: #721c24;
 }
 
 /* 简单的 Tooltip */
@@ -312,18 +496,44 @@ const nextSentence = (): void => {
   width: 100px;
   height: 100px;
   border-radius: 50%;
-  border: 5px solid #42b883;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   background: white;
-  box-shadow: 0 4px 15px rgba(66, 184, 131, 0.2);
+  transition: all 0.3s;
 }
+
+.score-circle.good {
+  border: 5px solid #28a745;
+  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+}
+
+.score-circle.good .score-number {
+  color: #28a745;
+}
+
+.score-circle.medium {
+  border: 5px solid #ffc107;
+  box-shadow: 0 4px 15px rgba(255, 193, 7, 0.3);
+}
+
+.score-circle.medium .score-number {
+  color: #ffc107;
+}
+
+.score-circle.bad {
+  border: 5px solid #dc3545;
+  box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+}
+
+.score-circle.bad .score-number {
+  color: #dc3545;
+}
+
 .score-number {
   font-size: 2.5rem;
   font-weight: bold;
-  color: #42b883;
 }
 .score-label {
   font-size: 0.8rem;
@@ -374,6 +584,32 @@ const nextSentence = (): void => {
   box-shadow: none;
 }
 
+.result-actions {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+.play-btn {
+  padding: 15px 30px;
+  background: #3498db;
+  color: white;
+  border: none;
+  border-radius: 30px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.play-btn:hover:not(:disabled) {
+  background: #2980b9;
+}
+
+.play-btn:disabled {
+  background: #95a5a6;
+  cursor: not-allowed;
+}
+
 .next-btn {
   padding: 15px 40px;
   background: #2c3e50;
@@ -384,8 +620,24 @@ const nextSentence = (): void => {
   cursor: pointer;
   transition: background 0.2s;
 }
+
 .next-btn:hover {
   background: #34495e;
+}
+
+.retry-btn {
+  padding: 15px 40px;
+  background: #7f8c8d;
+  color: white;
+  border: none;
+  border-radius: 30px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.retry-btn:hover {
+  background: #95a5a6;
 }
 
 @keyframes pulse {

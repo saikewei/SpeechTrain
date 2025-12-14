@@ -5,11 +5,61 @@
 #include <algorithm>
 #include <cctype>
 
+// --- 新增：用于在回调中传递数据的上下文结构 ---
+struct SynthesisContext {
+    std::vector<WordAnalysis>* results;
+    const std::string* originalText;
+    WordAnalysis* currentWord;
+};
+
+// --- 新增：espeak 回调函数 ---
+static int SynthCallback(short* wav, int numsamples, espeak_EVENT* events) {
+    while (events->type != espeakEVENT_LIST_TERMINATED) {
+    // 获取我们在 espeak_Synth 中传入的 user_data
+    SynthesisContext* ctx = static_cast<SynthesisContext*>(events->user_data);
+
+    if (ctx) {
+        if (events->type == espeakEVENT_WORD) {
+            // espeak 告诉我们要开始处理一个新的单词了
+            WordAnalysis wa;
+
+            // 根据事件提供的 text_position 和 length 从原句中截取单词
+            // 这样可以保证单词划分与 espeak 的理解一致
+            if (ctx->originalText &&
+                events->text_position >= 0 &&
+                (size_t)(events->text_position + events->length - 1) <= ctx->originalText->length()) {
+				int length = events->length;
+                if (ctx->originalText->at(events->text_position + events->length - 1) == '\'') {
+                    do {
+                        length++;
+                    } while (ctx->originalText->size() > events->text_position + length - 1 && ctx->originalText->at(events->text_position + length - 1) != ' ');
+                }
+                wa.word = ctx->originalText->substr(events->text_position - 1, length);
+            }
+
+            ctx->results->push_back(wa);
+            // 更新当前正在填充音素的单词指针
+            ctx->currentWord = &ctx->results->back();
+        }
+        else if (events->type == espeakEVENT_PHONEME) {
+            // espeak 生成了一个音素
+            if (ctx->currentWord) {
+                // events->id.string 是一个 UTF-8 字符数组，包含 IPA 音素
+                ctx->currentWord->raw_ipa += events->id.string;
+            }
+        }
+    }
+    events++;
+}
+return 0; // 返回 0 继续合成
+}
+
 Phonemizer::Phonemizer(const std::string& espeakDataPath, const std::map<std::string, int>& _vocab, const std::string& voiceName) : initialized(false), vocab(_vocab) {
     // 1. 初始化 espeak
     // AUDIO_OUTPUT_RETRIEVAL: 我们不需要播放声音，只需要获取音素
     // 传入 espeak-ng-data 的父目录路径
-    int sampleRate = espeak_Initialize(AUDIO_OUTPUT_RETRIEVAL, 0, espeakDataPath.c_str(), 0);
+    int options = espeakINITIALIZE_PHONEME_EVENTS | espeakINITIALIZE_PHONEME_IPA;
+    int sampleRate = espeak_Initialize(AUDIO_OUTPUT_SYNCHRONOUS, 0, espeakDataPath.c_str(), options);
 
     if (sampleRate == -1) {
         std::cerr << "[Phonemizer Error] Failed to initialize espeak-ng. "
@@ -17,6 +67,9 @@ Phonemizer::Phonemizer(const std::string& espeakDataPath, const std::map<std::st
         initialized = false;
         return;
     }
+
+    // [新增] 注册回调函数
+    espeak_SetSynthCallback(SynthCallback);
 
     // 2. 设置语音
     if (espeak_SetVoiceByName(voiceName.c_str()) != EE_OK) {
@@ -43,7 +96,7 @@ std::string Phonemizer::removePunctuation(const std::string& text) {
     // 注意：这会把 "it's" 变成 "its"，这对 espeak 来说通常是可以接受的
     // 如果需要保留单引号，可以在 lambda 里加条件
     result.erase(std::remove_if(result.begin(), result.end(), [](unsigned char c) {
-        return std::ispunct(c);
+        return std::ispunct(c) && c != '\''; // 保留单引号
         }), result.end());
     return result;
 }
@@ -176,26 +229,44 @@ std::vector<std::string> Phonemizer::cleanAndTokenizeIPA(const std::string& raw_
     return tokens;
 }
 
-// [核心] 句子分析：分词 -> 去标点 -> 转音素 -> 结构化存储
+// [核心] 句子分析
 std::vector<WordAnalysis> Phonemizer::analyzeText(const std::string& sentence) {
     std::vector<WordAnalysis> results;
-    std::stringstream ss(sentence);
-    std::string word;
+    if (!initialized) return results;
 
-    // 1. 按空格分词 (简单的 Tokenization)
-    while (ss >> word) {
-        WordAnalysis wa;
-        wa.word = word;
+    // 准备上下文数据，供回调函数使用
+    SynthesisContext ctx;
+    ctx.results = &results;
+    ctx.originalText = &sentence;
+    ctx.currentWord = nullptr;
 
-        std::string clean_word = word;
-        clean_word.erase(std::remove_if(clean_word.begin(), clean_word.end(), ::ispunct), clean_word.end());
+    // 调用 espeak_Synth 处理整句
+    // espeakCHARS_AUTO: 自动检测编码 (UTF-8)
+    // user_data: 传入 ctx 指针，这样回调函数就能把数据写回 results
+    unsigned int unique_identifier;
+    espeak_ERROR err = espeak_Synth(
+        sentence.c_str(),
+        sentence.length() + 1, // size (包含 null 终止符)
+        0, // position
+        POS_CHARACTER, // position_type
+        0, // end_position
+        espeakCHARS_AUTO, // flags
+        &unique_identifier,
+        &ctx // user_data
+    );
 
-        wa.raw_ipa = rawEspeakCall(clean_word);
+    if (err != EE_OK) {
+        std::cerr << "[Phonemizer Error] espeak_Synth failed with error code: " << err << std::endl;
+        return results;
+    }
 
-        // [修改] 调用新的分词逻辑，传入 vocab
+    // 因为使用了 AUDIO_OUTPUT_SYNCHRONOUS，代码运行到这里时，
+    // 回调函数已经执行完毕，results 中已经填满了单词和对应的 raw_ipa
+
+    // 后处理：对每个单词的 raw_ipa 进行清洗和分词 (Tokenization)
+    // 这一步复用你现有的逻辑，将 IPA 字符串切分成词表中的 token
+    for (auto& wa : results) {
         wa.phonemes = cleanAndTokenizeIPA(wa.raw_ipa);
-
-        results.push_back(wa);
     }
 
     return results;

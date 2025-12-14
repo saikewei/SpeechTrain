@@ -112,6 +112,9 @@ class SpeechService {
     }
 
     try {
+      if (text[text.length - 1] !== '.') {
+        text += '.'
+      }
       console.time('InferenceRaw')
       // 直接调用 C++ 的重载方法
       const result = this.engine.analyze(pcmData, sampleRate, channels, text)
