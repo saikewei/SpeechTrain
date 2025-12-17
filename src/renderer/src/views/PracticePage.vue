@@ -15,6 +15,11 @@ const currentSentence = ref<CourseContent | undefined>(undefined)
 const currentIndex = ref(0)
 const currentPhonemes = ref<string>('')
 
+// 播放示例语音相关
+const isPlayingExample = ref(false)
+const isTTSConfigured = ref(false)
+let exampleAudioContext: AudioContext | null = null
+
 onMounted(async () => {
   try {
     isLoading.value = true
@@ -29,6 +34,9 @@ onMounted(async () => {
       return
     }
     currentSentence.value = course.value.content[0]
+
+    // 检查 TTS 是否配置
+    isTTSConfigured.value = await window.api.ttsIsConfigured()
   } catch (error) {
     console.error('Failed to load practice data:', error)
   } finally {
@@ -43,7 +51,71 @@ onUnmounted(() => {
   if (playbackAudioContext) {
     stopPlayback()
   }
+  if (exampleAudioContext) {
+    stopExamplePlayback()
+  }
 })
+
+// 播放示例语音
+const playExampleAudio = async (): Promise<void> => {
+  if (!currentSentence.value || isPlayingExample.value || !isTTSConfigured.value) return
+
+  try {
+    isPlayingExample.value = true
+
+    // 调用 TTS API
+    const audioData = (await window.api.ttsSynthesize(
+      currentSentence.value.text,
+      course.value?.lang || 'en'
+    )) as ArrayBuffer | Uint8Array | number[]
+
+    // 确保数据是 ArrayBuffer 类型
+    let audioBuffer: ArrayBuffer
+    if (audioData instanceof ArrayBuffer) {
+      audioBuffer = audioData
+    } else if (audioData instanceof Uint8Array) {
+      audioBuffer = audioData.buffer as ArrayBuffer
+    } else if (Array.isArray(audioData)) {
+      audioBuffer = new Uint8Array(audioData).buffer
+    } else {
+      throw new Error('不支持的音频数据格式')
+    }
+
+    // 创建 AudioContext 播放
+    exampleAudioContext = new AudioContext()
+    const decodedData = await exampleAudioContext.decodeAudioData(audioBuffer)
+
+    const source = exampleAudioContext.createBufferSource()
+    source.buffer = decodedData
+    source.connect(exampleAudioContext.destination)
+
+    source.onended = () => {
+      isPlayingExample.value = false
+      if (exampleAudioContext) {
+        exampleAudioContext.close()
+        exampleAudioContext = null
+      }
+    }
+
+    source.start(0)
+  } catch (error) {
+    console.error('播放示例语音失败:', error)
+    alert('播放失败: ' + (error as Error).message)
+    isPlayingExample.value = false
+    if (exampleAudioContext) {
+      await exampleAudioContext.close()
+      exampleAudioContext = null
+    }
+  }
+}
+
+const stopExamplePlayback = (): void => {
+  if (exampleAudioContext) {
+    exampleAudioContext.close()
+    exampleAudioContext = null
+  }
+  isPlayingExample.value = false
+}
 
 // --- 录音相关变量 ---
 let audioContext: AudioContext | null = null
@@ -285,6 +357,19 @@ const stopPlayback = (): void => {
         <div v-else>
           <h2 class="main-text">{{ currentSentence?.text }}</h2>
           <div class="phonetic">{{ currentPhonemes }}</div>
+        </div>
+
+        <button
+          v-if="currentState !== 'result' && isTTSConfigured"
+          class="example-audio-btn"
+          :disabled="isPlayingExample"
+          @click="playExampleAudio"
+        >
+          {{ isPlayingExample ? '🔊 播放中...' : '🔊 听示例' }}
+        </button>
+
+        <div v-if="!isTTSConfigured && currentState !== 'result'" class="tts-warning">
+          ⚠️ TTS 未配置，无法播放示例语音
         </div>
       </div>
 
@@ -638,6 +723,34 @@ const stopPlayback = (): void => {
 
 .retry-btn:hover {
   background: #95a5a6;
+}
+
+.example-audio-btn {
+  margin-top: 15px;
+  padding: 10px 25px;
+  background: #3498db;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.example-audio-btn:hover:not(:disabled) {
+  background: #2980b9;
+  transform: translateY(-2px);
+}
+
+.example-audio-btn:disabled {
+  background: #95a5a6;
+  cursor: not-allowed;
+}
+
+.tts-warning {
+  margin-top: 10px;
+  font-size: 0.9rem;
+  color: #e67e22;
 }
 
 @keyframes pulse {

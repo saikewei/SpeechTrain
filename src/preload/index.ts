@@ -8,7 +8,13 @@ const api = {
   phonemize: (text: string) => ipcRenderer.invoke('phonemize', text),
   setEspeakLanguage: (lang: string) => ipcRenderer.invoke('set-espeak-language', lang),
   analyzeRawAudio: (pcmData: Float32Array, text: string) =>
-    ipcRenderer.invoke('analyze-raw-audio', pcmData, text)
+    ipcRenderer.invoke('analyze-raw-audio', pcmData, text),
+  // TTS APIs
+  ttsSynthesize: (text: string, langCode: string): Promise<ArrayBuffer> =>
+    ipcRenderer.invoke('tts-synthesize', text, langCode),
+  ttsGetLanguages: (): Promise<Array<{ code: string; name: string; voice: string }>> =>
+    ipcRenderer.invoke('tts-get-languages'),
+  ttsIsConfigured: (): Promise<boolean> => ipcRenderer.invoke('tts-is-configured')
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

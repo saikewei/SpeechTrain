@@ -12,3 +12,4 @@ native_module/libs
 resources/bin
 resources/espeak-ng-data
 resources/models
+.env

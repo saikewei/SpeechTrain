@@ -17,6 +17,9 @@ declare global {
       setEspeakLanguage: (lang: string) => Promise<void>
       // 分析音频
       analyzeRawAudio: (pcmData: Float32Array, text: string) => Promise<AnalysisResult>
+      ttsSynthesize: (text: string, langCode: string) => Promise<ArrayBuffer>
+      ttsGetLanguages: () => Promise<Array<{ code: string; name: string; voice: string }>>
+      ttsIsConfigured: () => Promise<boolean>
     }
   }
 }

@@ -4,6 +4,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { loadCourses } from './courseService'
 import { speechService } from './SpeechService'
+import { ttsService } from './ttsService'
 
 app.commandLine.appendSwitch('no-sandbox')
 // 定义两个窗口变量
@@ -164,6 +165,25 @@ app.whenReady().then(async () => {
   ipcMain.handle('analyze-raw-audio', (_event, pcmData: Float32Array, text: string) => {
     const result = speechService.analyzeRaw(pcmData, 16000, 1, text)
     return result
+  })
+
+  // TTS 相关 API
+  ipcMain.handle('tts-synthesize', async (_event, text: string, langCode: string) => {
+    try {
+      const audioBuffer = await ttsService.synthesize(text, langCode)
+      return audioBuffer
+    } catch (error) {
+      console.error('[Main] TTS 合成失败:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('tts-get-languages', () => {
+    return ttsService.getSupportedLanguages()
+  })
+
+  ipcMain.handle('tts-is-configured', () => {
+    return ttsService.isConfigured()
   })
 
   createWindow()
