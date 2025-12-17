@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import type { CourseSummary } from '../../../shared/types'
 
@@ -7,8 +7,13 @@ const router = useRouter()
 
 // 状态：课程列表 (初始为空)
 const courses = ref<CourseSummary[]>([])
-const currentLang = ref('英语')
+const currentLang = ref(localStorage.getItem('lastSelectedLang') || '英语')
 const isLoading = ref(true)
+
+// 新增：监听语种变化并保存
+watch(currentLang, (newLang) => {
+  localStorage.setItem('lastSelectedLang', newLang)
+})
 
 // 计算属性：从已加载的课程中动态提取语种列表
 const languages = computed(() => {
