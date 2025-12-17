@@ -20,6 +20,9 @@ declare global {
       ttsSynthesize: (text: string, langCode: string) => Promise<ArrayBuffer>
       ttsGetLanguages: () => Promise<Array<{ code: string; name: string; voice: string }>>
       ttsIsConfigured: () => Promise<boolean>
+
+      // LLM 音频分析
+      llmAnalyzeAudio: (audioBuffer: number[], prompt: string) => Promise<string>
     }
   }
 }

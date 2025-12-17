@@ -208,6 +208,13 @@ const analyzeAudio = async (pcmData: Float32Array): Promise<void> => {
 
     result.value = await window.api.analyzeRawAudio(pcmData, currentSentence.value.text)
     currentState.value = 'result'
+    // 将 Float32Array 转换为普通数组传递给后端
+    const pcmArray = Array.from(pcmData)
+    const llm_result = await window.api.llmAnalyzeAudio(
+      pcmArray,
+      `这是一个口语练习者的录音，原文是"${currentSentence.value.text}"，请客观评价他的发音质量。如果发音不好，请指出具体的错误之处，并给出改进建议。`
+    )
+    console.log('LLM 分析结果:', llm_result)
 
     console.log('分析结果:', result.value)
   } catch (error) {

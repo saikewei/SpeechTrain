@@ -4,7 +4,8 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { loadCourses } from './courseService'
 import { speechService } from './SpeechService'
-import { ttsService } from './ttsService'
+import { ttsService } from './TTSService'
+import { llmService } from './LLMService'
 
 app.commandLine.appendSwitch('no-sandbox')
 // 定义两个窗口变量
@@ -165,6 +166,43 @@ app.whenReady().then(async () => {
   ipcMain.handle('analyze-raw-audio', (_event, pcmData: Float32Array, text: string) => {
     const result = speechService.analyzeRaw(pcmData, 16000, 1, text)
     return result
+  })
+
+  ipcMain.handle('llm-analyze-audio', async (_event, pcmArray: number[], prompt: string) => {
+    // 将普通数组转换为 Float32Array
+    const float32Data = new Float32Array(pcmArray)
+
+    // 将 Float32Array 转换为 Int16 PCM 数据
+    const int16Data = new Int16Array(float32Data.length)
+    for (let i = 0; i < float32Data.length; i++) {
+      int16Data[i] = Math.max(-32768, Math.min(32767, Math.floor(float32Data[i] * 32768)))
+    }
+
+    // 构建 WAV 文件头 (44字节)
+    const wavHeader = Buffer.alloc(44)
+    const sampleRate = 16000
+    const numChannels = 1
+    const bitDepth = 16
+    const dataLength = int16Data.byteLength
+
+    wavHeader.write('RIFF', 0)
+    wavHeader.writeUInt32LE(36 + dataLength, 4)
+    wavHeader.write('WAVE', 8)
+    wavHeader.write('fmt ', 12)
+    wavHeader.writeUInt32LE(16, 16) // Subchunk1Size
+    wavHeader.writeUInt16LE(1, 20) // AudioFormat (1 = PCM)
+    wavHeader.writeUInt16LE(numChannels, 22)
+    wavHeader.writeUInt32LE(sampleRate, 24)
+    wavHeader.writeUInt32LE(sampleRate * numChannels * (bitDepth / 8), 28) // ByteRate
+    wavHeader.writeUInt16LE(numChannels * (bitDepth / 8), 32) // BlockAlign
+    wavHeader.writeUInt16LE(bitDepth, 34)
+    wavHeader.write('data', 36)
+    wavHeader.writeUInt32LE(dataLength, 40)
+
+    // 组合 WAV 头和 PCM 数据
+    const wavBuffer = Buffer.concat([wavHeader, Buffer.from(int16Data.buffer)])
+
+    return await llmService.analyzeAudio(wavBuffer, prompt)
   })
 
   // TTS 相关 API

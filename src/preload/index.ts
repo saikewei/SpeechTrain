@@ -14,7 +14,10 @@ const api = {
     ipcRenderer.invoke('tts-synthesize', text, langCode),
   ttsGetLanguages: (): Promise<Array<{ code: string; name: string; voice: string }>> =>
     ipcRenderer.invoke('tts-get-languages'),
-  ttsIsConfigured: (): Promise<boolean> => ipcRenderer.invoke('tts-is-configured')
+  ttsIsConfigured: (): Promise<boolean> => ipcRenderer.invoke('tts-is-configured'),
+  // LLM 音频分析
+  llmAnalyzeAudio: (audioBuffer: number[], prompt: string): Promise<string> =>
+    ipcRenderer.invoke('llm-analyze-audio', audioBuffer, prompt)
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to
