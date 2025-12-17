@@ -127,6 +127,9 @@ let recordedAudioData: Float32Array | null = null // 保存完整录音数据
 
 // 开始录音
 const startRecording = async (): Promise<void> => {
+  if (isPlayingExample.value) {
+    stopExamplePlayback()
+  }
   try {
     // 1. 获取麦克风权限
     mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true })
