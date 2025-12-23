@@ -216,7 +216,7 @@ const analyzeAudio = async (pcmData: Float32Array): Promise<void> => {
     result.value = await window.api.analyzeRawAudio(pcmData, currentSentence.value.text)
     currentState.value = 'result'
 
-    // 启动 LLM 分析（异步进行，不阻塞结果展示）
+    // 启动 LLM 分析(异步进行,不阻塞结果展示)
     isLLMAnalyzing.value = true
     llmAnalysis.value = ''
 
@@ -225,13 +225,23 @@ const analyzeAudio = async (pcmData: Float32Array): Promise<void> => {
       const pcmArray = Array.from(pcmData)
       const llm_result = await window.api.llmAnalyzeAudio(
         pcmArray,
-        `请评价这段音频的发音质量。原文是："${currentSentence.value.text}"。`
+        `请评价这段音频的发音质量。原文是:"${currentSentence.value.text}"。`
       )
       llmAnalysis.value = llm_result
       console.log('LLM 分析结果:', llm_result)
     } catch (error) {
-      console.error('LLM 分析失败:', error)
-      llmAnalysis.value = '⚠️ AI 分析服务暂时不可用'
+      // 识别 abort 错误,不显示提示
+      const errorMessage = (error as Error).message || String(error)
+      if (
+        errorMessage.includes('LLM_REQUEST_ABORTED') ||
+        errorMessage.includes('Request aborted')
+      ) {
+        console.log('LLM 分析被新请求中断')
+        // 不显示错误信息,这是正常的中断行为
+      } else {
+        console.error('LLM 分析失败:', error)
+        llmAnalysis.value = '⚠️ AI 分析服务暂时不可用'
+      }
     } finally {
       isLLMAnalyzing.value = false
     }
@@ -239,7 +249,7 @@ const analyzeAudio = async (pcmData: Float32Array): Promise<void> => {
     console.log('分析结果:', result.value)
   } catch (error) {
     console.error('分析失败:', error)
-    alert('分析失败，请重试')
+    alert('分析失败,请重试')
     currentState.value = 'idle'
   }
 }

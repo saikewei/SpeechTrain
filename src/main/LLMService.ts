@@ -8,9 +8,31 @@ class LLMService {
     return settings.getSettings().DASHSCOPE_API_KEY || ''
   }
   private baseUrl: string
+  private activeConnection: WebSocket | null = null
+  private abortController: AbortController | null = null
 
   constructor() {
     this.baseUrl = 'wss://sg.uiuiapi.com/v1/realtime?model=gpt-4o-realtime-preview'
+  }
+
+  /**
+   * 中断当前正在进行的请求
+   */
+  private abortCurrentRequest(): void {
+    if (this.activeConnection) {
+      console.log('[LLM] Aborting previous request')
+      try {
+        this.activeConnection.close()
+      } catch (error) {
+        console.error('[LLM] Error closing WebSocket:', error)
+      }
+      this.activeConnection = null
+    }
+
+    if (this.abortController) {
+      this.abortController.abort()
+      this.abortController = null
+    }
   }
 
   /**
@@ -59,11 +81,23 @@ class LLMService {
       throw new Error('API Key is not configured')
     }
 
+    // 中断之前的请求
+    this.abortCurrentRequest()
+
+    // 创建新的 AbortController
+    this.abortController = new AbortController()
+    const currentAbortController = this.abortController
+
     try {
       // 1. 处理音频
       console.log('[LLM] Processing audio...')
       const base64Audio = await this.processAudioBuffer(audioBuffer)
       console.log('[LLM] Audio processed, length:', base64Audio.length)
+
+      // 检查是否已被中断
+      if (currentAbortController.signal.aborted) {
+        throw new Error('LLM_REQUEST_ABORTED')
+      }
 
       // 2. 建立 WebSocket 连接
       return new Promise((resolve, reject) => {
@@ -74,8 +108,30 @@ class LLMService {
           }
         })
 
+        // 保存当前活动连接
+        this.activeConnection = ws
+
         let responseText = ''
         let isProcessing = false
+        let isResolved = false
+
+        // 监听中断信号
+        const abortHandler = (): void => {
+          if (!isResolved) {
+            console.log('[LLM] Request aborted by new request')
+            ws.close()
+            isResolved = true
+            reject(new Error('LLM_REQUEST_ABORTED'))
+          }
+        }
+        currentAbortController.signal.addEventListener('abort', abortHandler)
+
+        const cleanup = (): void => {
+          currentAbortController.signal.removeEventListener('abort', abortHandler)
+          if (this.activeConnection === ws) {
+            this.activeConnection = null
+          }
+        }
 
         ws.on('open', () => {
           console.log('[LLM] WebSocket connected')
@@ -140,7 +196,11 @@ class LLMService {
             if (eventType === 'error') {
               console.error('[LLM] Server error:', message.error.message)
               ws.close()
-              reject(new Error(message.error.message))
+              cleanup()
+              if (!isResolved) {
+                isResolved = true
+                reject(new Error(message.error.message))
+              }
               return
             }
 
@@ -153,7 +213,11 @@ class LLMService {
             if (eventType === 'response.done') {
               console.log('[LLM] Response completed')
               ws.close()
-              resolve(responseText || '未能获取到分析结果')
+              cleanup()
+              if (!isResolved) {
+                isResolved = true
+                resolve(responseText || '未能获取到分析结果')
+              }
             }
           } catch (err) {
             console.error('[LLM] Message parsing error:', err)
@@ -162,22 +226,28 @@ class LLMService {
 
         ws.on('error', (error) => {
           console.error('[LLM] WebSocket error:', error)
-          if (isProcessing) {
+          cleanup()
+          if (isProcessing && !isResolved) {
+            isResolved = true
             reject(error)
           }
         })
 
         ws.on('close', () => {
           console.log('[LLM] WebSocket closed')
-          if (isProcessing && !responseText) {
+          cleanup()
+          if (isProcessing && !responseText && !isResolved) {
+            isResolved = true
             reject(new Error('Connection closed without response'))
           }
         })
 
         // 设置超时
         setTimeout(() => {
-          if (isProcessing && !responseText) {
+          if (isProcessing && !responseText && !isResolved) {
             ws.close()
+            cleanup()
+            isResolved = true
             reject(new Error('Request timeout'))
           }
         }, 60000) // 60秒超时
