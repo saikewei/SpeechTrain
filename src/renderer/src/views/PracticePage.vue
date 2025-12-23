@@ -15,6 +15,9 @@ const currentSentence = ref<CourseContent | undefined>(undefined)
 const currentIndex = ref(0)
 const currentPhonemes = ref<string>('')
 
+// 添加：收集所有句子的得分记录
+const sentenceResults = ref<Array<{ text: string; score: number; timestamp: number }>>([])
+
 // 播放示例语音相关
 const isPlayingExample = ref(false)
 const isTTSConfigured = ref(false)
@@ -251,10 +254,26 @@ const toggleRecord = (): void => {
 
 const nextSentence = (): void => {
   if (!course.value) return
+
+  // 保存当前句子的得分
+  if (currentSentence.value && result.value) {
+    sentenceResults.value.push({
+      text: currentSentence.value.text,
+      score: getDisplayScore(result.value.overall_score),
+      timestamp: Date.now()
+    })
+  }
+
   currentIndex.value += 1
   if (currentIndex.value >= course.value.content.length) {
-    // 课程结束，返回首页
-    router.push('/')
+    // 课程结束，跳转到结算页面
+    router.push({
+      name: 'Result',
+      query: {
+        title: course.value.title,
+        results: JSON.stringify(sentenceResults.value)
+      }
+    })
     return
   }
   currentSentence.value = course.value.content[currentIndex.value]

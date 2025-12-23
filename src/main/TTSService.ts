@@ -38,6 +38,11 @@ const VOICE_MAP: Record<string, VoiceConfig> = {
     voice: 'es-ES-ElviraNeural',
     gender: 'Female'
   },
+  俄语: {
+    lang: 'ru-RU',
+    voice: 'ru-RU-SvetlanaNeural',
+    gender: 'Female'
+  },
   // 按照语言代码索引（用于 API 调用）
   en: {
     lang: 'en-US',
@@ -67,6 +72,11 @@ const VOICE_MAP: Record<string, VoiceConfig> = {
   es: {
     lang: 'es-ES',
     voice: 'es-ES-ElviraNeural',
+    gender: 'Female'
+  },
+  ru: {
+    lang: 'ru-RU',
+    voice: 'ru-RU-SvetlanaNeural',
     gender: 'Female'
   }
 }
@@ -177,7 +187,8 @@ class TTSService {
       { code: 'ja', name: '日语', voice: VOICE_MAP['日语'].voice },
       { code: 'fr', name: '法语', voice: VOICE_MAP['法语'].voice },
       { code: 'de', name: '德语', voice: VOICE_MAP['德语'].voice },
-      { code: 'es', name: '西班牙语', voice: VOICE_MAP['西班牙语'].voice }
+      { code: 'es', name: '西班牙语', voice: VOICE_MAP['西班牙语'].voice },
+      { code: 'ru', name: '俄语', voice: VOICE_MAP['俄语'].voice }
     ]
   }
 

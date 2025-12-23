@@ -1,6 +1,7 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import HomePage from '../views/HomePage.vue'
-import PracticePage from '../views/PracticePage.vue' // 导入新页面
+import PracticePage from '../views/PracticePage.vue'
+import ResultPage from '../views/ResultPage.vue' // 导入结算页面
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -11,10 +12,15 @@ const router = createRouter({
       component: HomePage
     },
     {
-      // 动态路由，:id 代表课程ID
       path: '/practice/:id',
       name: 'Practice',
       component: PracticePage
+    },
+    {
+      // 结算页面路由
+      path: '/result',
+      name: 'Result',
+      component: ResultPage
     }
   ]
 })

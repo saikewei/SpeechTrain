@@ -47,8 +47,10 @@ function createSplashWindow(): void {
 function createWindow(): void {
   // Create the browser window.
   mainWindow = new BrowserWindow({
-    width: 1100,
-    height: 900,
+    width: 1200,
+    height: 1000,
+    minWidth: 800,
+    minHeight: 600,
     show: false, // 先隐藏，等准备好了再显示
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
@@ -164,6 +166,9 @@ app.whenReady().then(async () => {
         break
       case '西班牙语':
         lang = 'es'
+        break
+      case '俄语':
+        lang = 'ru'
         break
       default:
         lang = 'en-us'
