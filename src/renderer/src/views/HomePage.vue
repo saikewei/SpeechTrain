@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import type { CourseSummary, SettingsData } from '../../../shared/types'
+import type { CourseSummary, SettingsData, ScoreRecord } from '../../../shared/types'
 
 const router = useRouter()
 
-// 状态：课程列表 (初始为空)
+// 状态:课程列表 (初始为空)
 const courses = ref<CourseSummary[]>([])
 const currentLang = ref(localStorage.getItem('lastSelectedLang') || '英语')
 const isLoading = ref(true)
@@ -18,6 +18,11 @@ const settingsForm = ref<SettingsData>({
   DASHSCOPE_API_KEY: ''
 })
 const isSavingSettings = ref(false)
+
+// 历史记录对话框相关状态
+const showHistory = ref(false)
+const scoreHistory = ref<ScoreRecord[]>([])
+const isLoadingHistory = ref(false)
 
 // Toast 通知状态
 const toast = ref({
@@ -109,6 +114,66 @@ const saveSettings = async (): Promise<void> => {
 const closeSettings = (): void => {
   showSettings.value = false
 }
+
+// 打开历史记录对话框
+const openHistory = async (): Promise<void> => {
+  try {
+    isLoadingHistory.value = true
+    showHistory.value = true
+    const history = await window.api.getScoreHistory()
+    scoreHistory.value = history
+  } catch (error) {
+    console.error('Failed to load history:', error)
+    showToast('加载历史记录失败', 'error')
+  } finally {
+    isLoadingHistory.value = false
+  }
+}
+
+// 关闭历史记录对话框
+const closeHistory = (): void => {
+  showHistory.value = false
+}
+
+// 清除历史记录
+const clearHistory = async (): Promise<void> => {
+  if (!confirm('确定要清除所有历史记录吗?')) return
+
+  try {
+    await window.api.clearScoreHistory()
+    scoreHistory.value = []
+    showToast('历史记录已清除', 'success')
+  } catch (error) {
+    console.error('Failed to clear history:', error)
+    showToast('清除失败,请重试', 'error')
+  }
+}
+
+// 格式化时间戳
+const formatDate = (timestamp: number): string => {
+  const date = new Date(timestamp)
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+// 格式化分数
+const formatScore = (score: number): string => {
+  return score.toFixed(1)
+}
+
+// 获取分数等级颜色
+const getScoreColor = (score: number): string => {
+  if (score >= 90) return '#42b883'
+  if (score >= 80) return '#5fa8d3'
+  if (score >= 70) return '#e6a23c'
+  if (score >= 60) return '#f56c6c'
+  return '#909399'
+}
 </script>
 
 <template>
@@ -119,7 +184,10 @@ const closeSettings = (): void => {
           <h1>🗣️ 口语训练营</h1>
           <p>选择一门语言开始练习</p>
         </div>
-        <button class="settings-btn" title="设置" @click="openSettings">⚙️</button>
+        <div class="header-actions">
+          <button class="settings-btn" title="历史记录" @click="openHistory">📊</button>
+          <button class="settings-btn" title="设置" @click="openSettings">⚙️</button>
+        </div>
       </div>
     </header>
 
@@ -211,6 +279,61 @@ const closeSettings = (): void => {
         </div>
       </div>
     </div>
+
+    <!-- 历史记录对话框 -->
+    <div v-if="showHistory" class="modal-overlay" @click.self="closeHistory">
+      <div class="history-modal">
+        <div class="modal-header">
+          <h2>📊 历史记录</h2>
+          <button class="close-btn" @click="closeHistory">✕</button>
+        </div>
+
+        <div class="modal-body">
+          <div v-if="isLoadingHistory" class="loading-state">加载中...</div>
+
+          <div v-else-if="scoreHistory.length === 0" class="empty-state">
+            <p>暂无历史记录</p>
+          </div>
+
+          <div v-else class="history-list">
+            <div v-for="record in scoreHistory" :key="record.timestamp" class="history-item">
+              <div class="history-header">
+                <div class="history-title">
+                  <span class="course-icon">📚</span>
+                  <span class="course-name">{{ record.courseTitle }}</span>
+                </div>
+                <div class="history-score" :style="{ color: getScoreColor(record.averageScore) }">
+                  {{ formatScore(record.averageScore) }}
+                </div>
+              </div>
+
+              <div class="history-time">{{ formatDate(record.timestamp) }}</div>
+
+              <div class="history-details">
+                <div v-for="(detail, index) in record.details" :key="index" class="detail-item">
+                  <span class="detail-text">{{ detail.text }}</span>
+                  <span class="detail-score" :style="{ color: getScoreColor(detail.score) }">
+                    {{ formatScore(detail.score) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button
+            class="btn btn-secondary"
+            :disabled="scoreHistory.length === 0"
+            @click="clearHistory"
+          >
+            清除记录
+          </button>
+          <button class="btn btn-primary" @click="closeHistory">关闭</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Toast 通知 -->
     <Transition name="toast">
       <div v-if="toast.show" :class="['toast', `toast-${toast.type}`]">
@@ -469,6 +592,104 @@ const closeSettings = (): void => {
 
 .btn-primary:hover:not(:disabled) {
   background: #35a372;
+}
+
+/* 历史记录模态框样式 */
+.history-modal {
+  background: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 700px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.history-modal .modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.history-item {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 16px;
+  transition: all 0.2s;
+}
+
+.history-item:hover {
+  background: #f0f2f5;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.history-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #2c3e50;
+  font-size: 1.1rem;
+}
+
+.course-icon {
+  font-size: 1.2rem;
+}
+
+.history-score {
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.history-time {
+  color: #7f8c8d;
+  font-size: 0.85rem;
+  margin-bottom: 12px;
+}
+
+.history-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.detail-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: white;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.detail-text {
+  color: #2c3e50;
+  flex: 1;
+  margin-right: 12px;
+}
+
+.detail-score {
+  font-weight: 600;
+  font-size: 1rem;
+  min-width: 40px;
+  text-align: right;
 }
 
 /* Toast 通知样式 */

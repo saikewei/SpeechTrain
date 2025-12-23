@@ -1,7 +1,7 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import { Course, CourseSummary } from '../shared/types'
 import { AnalysisResult } from '../shared/types'
-import { SettingsData } from '../shared/types'
+import { SettingsData, ScoreRecord } from '../shared/types'
 
 declare global {
   interface Window {
@@ -29,6 +29,13 @@ declare global {
       getSettings: () => Promise<SettingsData>
       // 更新设置
       updateSettings: (newSettings: Partial<SettingsData>) => Promise<void>
+
+      // 保存得分记录
+      saveScoreRecord: (record: ScoreRecord) => Promise<void>
+      // 获取得分历史
+      getScoreHistory: () => Promise<ScoreRecord[]>
+      // 清除得分历史
+      clearScoreHistory: () => Promise<void>
     }
   }
 }

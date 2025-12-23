@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import type { Course, CourseContent, AnalysisResult } from '../../../shared/types'
+import type { Course, CourseContent, AnalysisResult, ScoreRecord } from '../../../shared/types'
 
 const router = useRouter()
 
@@ -252,30 +252,23 @@ const toggleRecord = (): void => {
   }
 }
 
+const saveSentenceResult = (): void => {
+  if (!currentSentence.value || !result.value) return
+
+  sentenceResults.value.push({
+    text: currentSentence.value.text,
+    score: getDisplayScore(result.value.overall_score),
+    timestamp: Date.now()
+  })
+}
+
 const nextSentence = (): void => {
   if (!course.value) return
 
   // 保存当前句子的得分
-  if (currentSentence.value && result.value) {
-    sentenceResults.value.push({
-      text: currentSentence.value.text,
-      score: getDisplayScore(result.value.overall_score),
-      timestamp: Date.now()
-    })
-  }
+  saveSentenceResult()
 
   currentIndex.value += 1
-  if (currentIndex.value >= course.value.content.length) {
-    // 课程结束，跳转到结算页面
-    router.push({
-      name: 'Result',
-      query: {
-        title: course.value.title,
-        results: JSON.stringify(sentenceResults.value)
-      }
-    })
-    return
-  }
   currentSentence.value = course.value.content[currentIndex.value]
   currentPhonemes.value = ''
   window.api.phonemize(currentSentence.value.text).then((phonemes) => {
@@ -287,6 +280,43 @@ const nextSentence = (): void => {
   recordedAudioData = null
   isPlayingRecording.value = false
 }
+
+const endCourse = (): void => {
+  if (!course.value) {
+    router.push({ name: 'Home' })
+    return
+  }
+
+  // 保存当前句子的得分
+  saveSentenceResult()
+
+  // 计算平均分并保存到历史记录
+  const avgScore = Math.round(
+    sentenceResults.value.reduce((sum, r) => sum + r.score, 0) / sentenceResults.value.length
+  )
+
+  window.api.saveScoreRecord({
+    courseId: course.value.id,
+    courseTitle: course.value.title,
+    averageScore: avgScore,
+    timestamp: Date.now(),
+    details: sentenceResults.value.map((r) => ({ text: r.text, score: r.score }))
+  } as ScoreRecord)
+
+  // 课程结束，跳转到结算页面
+  router.push({
+    name: 'Result',
+    query: {
+      title: course.value.title,
+      results: JSON.stringify(sentenceResults.value)
+    }
+  })
+}
+
+const hasNextSentence = computed((): boolean => {
+  if (!course.value) return false
+  return currentIndex.value + 1 < course.value.content.length
+})
 
 const retry = (): void => {
   currentState.value = 'idle'
@@ -482,7 +512,8 @@ const stopPlayback = (): void => {
           {{ isPlayingRecording ? '⏸️ 播放中...' : '▶️ 播放录音' }}
         </button>
         <button class="retry-btn" @click="retry">再来一次</button>
-        <button class="next-btn" @click="nextSentence">下一句 →</button>
+        <button v-if="hasNextSentence" class="next-btn" @click="nextSentence">下一句 →</button>
+        <button v-else class="end-btn" @click="endCourse">结束课程</button>
       </div>
     </div>
 
@@ -556,6 +587,21 @@ const stopPlayback = (): void => {
   align-items: center;
   padding: 20px;
   text-align: center;
+}
+
+.end-btn {
+  padding: 15px 40px;
+  background: #27ae60;
+  color: white;
+  border: none;
+  border-radius: 30px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.end-btn:hover {
+  background: #219150;
 }
 
 .sentence-card h2 {
@@ -827,7 +873,7 @@ const stopPlayback = (): void => {
 }
 
 .retry-btn:hover {
-  background: #95a5a6;
+  background: #6bbf3a;
 }
 
 .example-audio-btn {

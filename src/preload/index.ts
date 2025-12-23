@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
-import { SettingsData } from '../shared/types'
+import { SettingsData, ScoreRecord } from '../shared/types'
 
 // Custom APIs for renderer
 const api = {
@@ -22,7 +22,12 @@ const api = {
   // Settings APIs
   getSettings: (): Promise<SettingsData> => ipcRenderer.invoke('get-settings'),
   updateSettings: (newSettings: Partial<SettingsData>): Promise<void> =>
-    ipcRenderer.invoke('update-settings', newSettings)
+    ipcRenderer.invoke('update-settings', newSettings),
+  // Score history APIs
+  saveScoreRecord: (record: ScoreRecord): Promise<void> =>
+    ipcRenderer.invoke('save-score-record', record),
+  getScoreHistory: (): Promise<ScoreRecord[]> => ipcRenderer.invoke('get-score-history'),
+  clearScoreHistory: (): Promise<void> => ipcRenderer.invoke('clear-score-history')
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

@@ -7,7 +7,8 @@ import { speechService } from './SpeechService'
 import { ttsService } from './TTSService'
 import { llmService } from './LLMService'
 import { settings } from './SettingsService'
-import { type SettingsData } from '../shared/types'
+import { scoreService } from './ScoreService'
+import { type SettingsData, type ScoreRecord } from '../shared/types'
 
 app.commandLine.appendSwitch('no-sandbox')
 // 定义两个窗口变量
@@ -119,6 +120,19 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('update-settings', (_event, newSettings: Partial<SettingsData>) => {
     settings.updateSettings(newSettings)
+  })
+
+  // 得分历史相关
+  ipcMain.handle('save-score-record', (_event, record: ScoreRecord) => {
+    scoreService.addRecord(record)
+  })
+
+  ipcMain.handle('get-score-history', () => {
+    return scoreService.getAllRecords()
+  })
+
+  ipcMain.handle('clear-score-history', () => {
+    scoreService.clearHistory()
   })
 
   // 获取课程列表 (只返回元数据，不返回具体 content 以减少流量)

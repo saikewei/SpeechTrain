@@ -4,7 +4,7 @@ export interface CourseContent {
 }
 
 export interface Course {
-  id: string | number
+  id: string
   title: string
   lang: string
   level: string
@@ -31,4 +31,15 @@ export interface SettingsData {
   AZURE_TTS_KEY: string
   AZURE_TTS_REGION: string
   DASHSCOPE_API_KEY: string
+}
+
+export interface ScoreRecord {
+  courseId: string
+  courseTitle: string
+  averageScore: number
+  timestamp: number
+  details: Array<{
+    text: string
+    score: number
+  }>
 }
