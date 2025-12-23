@@ -195,11 +195,15 @@ const stopRecording = async (): Promise<void> => {
 
   console.log('录音数据长度:', fullAudioData.length)
   console.log(fullAudioData)
+
   // 3. 发送给后端分析
   analyzeAudio(fullAudioData)
 }
 
 const result = ref<AnalysisResult | null>(null)
+const llmAnalysis = ref<string>('')
+const isLLMAnalyzing = ref(false)
+const showLLMDialog = ref(false)
 
 // 调用后端 API
 const analyzeAudio = async (pcmData: Float32Array): Promise<void> => {
@@ -208,13 +212,26 @@ const analyzeAudio = async (pcmData: Float32Array): Promise<void> => {
 
     result.value = await window.api.analyzeRawAudio(pcmData, currentSentence.value.text)
     currentState.value = 'result'
-    // 将 Float32Array 转换为普通数组传递给后端
-    const pcmArray = Array.from(pcmData)
-    const llm_result = await window.api.llmAnalyzeAudio(
-      pcmArray,
-      `这是一个口语练习者的录音，原文是"${currentSentence.value.text}"，请客观评价他的发音质量。如果发音不好，请指出具体的错误之处，并给出改进建议。`
-    )
-    console.log('LLM 分析结果:', llm_result)
+
+    // 启动 LLM 分析（异步进行，不阻塞结果展示）
+    isLLMAnalyzing.value = true
+    llmAnalysis.value = ''
+
+    try {
+      // 将 Float32Array 转换为普通数组传递给后端
+      const pcmArray = Array.from(pcmData)
+      const llm_result = await window.api.llmAnalyzeAudio(
+        pcmArray,
+        `请评价这段音频的发音质量。原文是："${currentSentence.value.text}"。`
+      )
+      llmAnalysis.value = llm_result
+      console.log('LLM 分析结果:', llm_result)
+    } catch (error) {
+      console.error('LLM 分析失败:', error)
+      llmAnalysis.value = '⚠️ AI 分析服务暂时不可用'
+    } finally {
+      isLLMAnalyzing.value = false
+    }
 
     console.log('分析结果:', result.value)
   } catch (error) {
@@ -258,6 +275,19 @@ const retry = (): void => {
   result.value = null
   recordedAudioData = null
   isPlayingRecording.value = false
+  llmAnalysis.value = ''
+  isLLMAnalyzing.value = false
+  showLLMDialog.value = false
+}
+
+// 打开 LLM 分析对话框
+const openLLMDialog = (): void => {
+  showLLMDialog.value = true
+}
+
+// 关闭 LLM 分析对话框
+const closeLLMDialog = (): void => {
+  showLLMDialog.value = false
 }
 
 // 计算指数化后的得分
@@ -393,6 +423,20 @@ const stopPlayback = (): void => {
         <div class="score-label">总分</div>
       </div>
 
+      <!-- AI 分析按钮 (仅在结果页显示) -->
+      <button
+        v-if="currentState === 'result'"
+        class="ai-analysis-btn"
+        :disabled="isLLMAnalyzing && !llmAnalysis"
+        @click="openLLMDialog"
+      >
+        <span v-if="isLLMAnalyzing && !llmAnalysis" class="btn-loading">
+          <span class="mini-spinner"></span>
+          AI 分析中...
+        </span>
+        <span v-else> 🤖 查看 AI 详细分析 </span>
+      </button>
+
       <!-- 3. 状态提示 -->
       <div class="status-text">
         <span v-if="currentState === 'idle'">点击麦克风开始跟读</span>
@@ -420,6 +464,38 @@ const stopPlayback = (): void => {
         </button>
         <button class="retry-btn" @click="retry">再来一次</button>
         <button class="next-btn" @click="nextSentence">下一句 →</button>
+      </div>
+    </div>
+
+    <!-- LLM 分析对话框 -->
+    <div v-if="showLLMDialog" class="dialog-overlay" @click="closeLLMDialog">
+      <div class="dialog-content" @click.stop>
+        <div class="dialog-header">
+          <h3>🤖 AI 详细分析</h3>
+          <button class="close-btn" @click="closeLLMDialog">✕</button>
+        </div>
+
+        <div class="dialog-body">
+          <!-- 加载状态 -->
+          <div v-if="isLLMAnalyzing && !llmAnalysis" class="analysis-loading">
+            <div class="loading-spinner"></div>
+            <p>AI 正在分析您的发音...</p>
+          </div>
+
+          <!-- 分析结果 -->
+          <div v-else-if="llmAnalysis" class="analysis-content">
+            <pre>{{ llmAnalysis }}</pre>
+          </div>
+
+          <!-- 无结果提示 -->
+          <div v-else class="analysis-empty">
+            <p>暂无分析结果</p>
+          </div>
+        </div>
+
+        <div class="dialog-footer">
+          <button class="dialog-close-btn" @click="closeLLMDialog">关闭</button>
+        </div>
       </div>
     </div>
   </div>
@@ -722,7 +798,7 @@ const stopPlayback = (): void => {
 
 .retry-btn {
   padding: 15px 40px;
-  background: #7f8c8d;
+  background: #86c24e;
   color: white;
   border: none;
   border-radius: 30px;
@@ -763,15 +839,219 @@ const stopPlayback = (): void => {
   color: #e67e22;
 }
 
-@keyframes pulse {
-  0% {
+/* AI 分析按钮 */
+.ai-analysis-btn {
+  margin-top: 20px;
+  padding: 12px 30px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 25px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-analysis-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+}
+
+.ai-analysis-btn:disabled {
+  background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.btn-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mini-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* 对话框样式 */
+.dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
     opacity: 1;
   }
-  50% {
-    opacity: 0.5;
+}
+
+.dialog-content {
+  background: white;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 700px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.3s;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(50px);
+    opacity: 0;
   }
-  100% {
+  to {
+    transform: translateY(0);
     opacity: 1;
   }
+}
+
+.dialog-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dialog-header h3 {
+  margin: 0;
+  font-size: 1.3rem;
+  color: #2c3e50;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #999;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background: #f0f0f0;
+  color: #666;
+}
+
+.dialog-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  min-height: 200px;
+}
+
+.analysis-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 0;
+  color: #666;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #f0f0f0;
+  border-top: 4px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+.analysis-content {
+  text-align: left;
+}
+
+.analysis-content pre {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  font-size: 1rem;
+  line-height: 1.8;
+  color: #2c3e50;
+  margin: 0;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 4px solid #667eea;
+}
+
+.analysis-empty {
+  padding: 40px;
+  text-align: center;
+  color: #999;
+}
+
+.dialog-footer {
+  padding: 16px 24px;
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.dialog-close-btn {
+  padding: 10px 30px;
+  background: #f0f0f0;
+  color: #666;
+  border: none;
+  border-radius: 20px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.dialog-close-btn:hover {
+  background: #e0e0e0;
+}
+
+/* 对话框滚动条样式 */
+.dialog-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dialog-body::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.dialog-body::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}
+
+.dialog-body::-webkit-scrollbar-thumb:hover {
+  background: #999;
 }
 </style>

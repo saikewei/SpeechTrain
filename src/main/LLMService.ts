@@ -1,56 +1,18 @@
 import { config } from 'dotenv'
-import { net } from 'electron'
+import WebSocket from 'ws'
+import ffmpeg from 'fluent-ffmpeg'
+import { Readable } from 'stream'
 
 config()
-
-interface AudioMessage {
-  audio: string // base64 格式的音频数据
-}
-
-interface TextMessage {
-  text: string
-}
-
-type ContentItem = AudioMessage | TextMessage
-
-interface Message {
-  role: 'system' | 'user' | 'assistant'
-  content: ContentItem[]
-}
-
-interface LLMRequest {
-  model: string
-  input: {
-    messages: Message[]
-  }
-}
-
-interface LLMResponse {
-  output: {
-    choices: Array<{
-      message: {
-        role: string
-        content: Array<{ text: string }>
-      }
-    }>
-  }
-  usage?: {
-    input_tokens: number
-    output_tokens: number
-  }
-}
 
 class LLMService {
   private apiKey: string
   private baseUrl: string
-  private model: string
 
   constructor() {
     // 从环境变量读取 API 密钥
     this.apiKey = process.env.DASHSCOPE_API_KEY || ''
-    this.baseUrl =
-      'https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation'
-    this.model = 'qwen-audio-turbo-latest'
+    this.baseUrl = 'wss://sg.uiuiapi.com/v1/realtime?model=gpt-4o-realtime-preview'
 
     if (!this.apiKey) {
       console.warn(
@@ -60,13 +22,35 @@ class LLMService {
   }
 
   /**
-   * 将音频 Buffer 转换为 base64 格式
-   * @param audioBuffer 音频数据
-   * @returns base64 编码的音频字符串
+   * 处理音频文件，转换为 PCM 16-bit, 24kHz, 单声道格式
    */
-  private bufferToBase64(audioBuffer: Buffer): string {
-    // 明确指定 MIME type 为 audio/wav
-    return `data:audio/wav;base64,${audioBuffer.toString('base64')}`
+  private async processAudioBuffer(audioBuffer: Buffer): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const bufferStream = new Readable()
+      bufferStream.push(audioBuffer)
+      bufferStream.push(null)
+
+      const chunks: Buffer[] = []
+
+      ffmpeg(bufferStream)
+        .audioFrequency(24000)
+        .audioChannels(1)
+        .audioCodec('pcm_s16le')
+        .format('s16le')
+        .on('error', (err) => {
+          console.error('[LLM] Audio processing error:', err)
+          reject(err)
+        })
+        .on('end', () => {
+          const rawData = Buffer.concat(chunks)
+          const base64Audio = rawData.toString('base64')
+          resolve(base64Audio)
+        })
+        .pipe()
+        .on('data', (chunk: Buffer) => {
+          chunks.push(chunk)
+        })
+    })
   }
 
   /**
@@ -79,79 +63,135 @@ class LLMService {
     audioBuffer: Buffer,
     prompt: string = '请评价这段音频的发音质量。'
   ): Promise<string> {
-    if (!this.apiKey) {
-      throw new Error(
-        'LLM API key is not configured. Please set the DASHSCOPE_API_KEY environment variable.'
-      )
+    if (!this.isConfigured()) {
+      throw new Error('API Key is not configured')
     }
-
-    const base64Audio = this.bufferToBase64(audioBuffer)
-
-    const requestBody: LLMRequest = {
-      model: this.model,
-      input: {
-        messages: [
-          {
-            role: 'system',
-            content: [{ text: '你是一个语言学家。' }]
-          },
-          {
-            role: 'user',
-            content: [{ audio: base64Audio }, { text: prompt }]
-          }
-        ]
-      }
-    }
-
-    console.log(`[LLM] Analyzing audio with prompt: "${prompt}"`)
 
     try {
-      const result = await new Promise<LLMResponse>((resolve, reject) => {
-        const request = net.request({
-          method: 'POST',
-          url: this.baseUrl
+      // 1. 处理音频
+      console.log('[LLM] Processing audio...')
+      const base64Audio = await this.processAudioBuffer(audioBuffer)
+      console.log('[LLM] Audio processed, length:', base64Audio.length)
+
+      // 2. 建立 WebSocket 连接
+      return new Promise((resolve, reject) => {
+        const ws = new WebSocket(this.baseUrl, {
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+            'OpenAI-Beta': 'realtime=v1'
+          }
         })
 
-        request.setHeader('Authorization', `Bearer ${this.apiKey}`)
-        request.setHeader('Content-Type', 'application/json')
+        let responseText = ''
+        let isProcessing = false
 
-        request.on('response', (response) => {
-          const chunks: Buffer[] = []
-          response.on('data', (chunk) => chunks.push(chunk))
-          response.on('end', () => {
-            const body = Buffer.concat(chunks).toString()
-            if (response.statusCode >= 200 && response.statusCode < 300) {
-              try {
-                resolve(JSON.parse(body))
-              } catch (e) {
-                reject(new Error('Failed to parse JSON response' + e))
+        ws.on('open', () => {
+          console.log('[LLM] WebSocket connected')
+
+          // 发送 session.update
+          ws.send(
+            JSON.stringify({
+              type: 'session.update',
+              session: {
+                modalities: ['text'],
+                instructions: `
+你是一位专业的口语纠正教练。
+你的任务是仅基于教育目的分析用户的音频输入。
+请严格专注于分析语音（phonetics）、咬字（articulation）、语调（intonation）和重音。
+**绝对不要**分析用户的声纹特征、性别、情绪状态或个人身份信息。
+
+输出要求：
+1. 必须使用中文进行回复。
+2. 明确指出发音不标准的地方。
+3. 使用音标（IPA）辅助解释。
+4. 给出具体的改进建议。
+                `.trim()
               }
-            } else {
-              reject(new Error(`API Error (${response.statusCode}): ${body}`))
-            }
-          })
-          response.on('error', (error) => reject(error))
+            })
+          )
+
+          // 发送 conversation.item.create
+          ws.send(
+            JSON.stringify({
+              type: 'conversation.item.create',
+              item: {
+                type: 'message',
+                role: 'user',
+                content: [
+                  {
+                    type: 'input_text',
+                    text: prompt
+                  },
+                  {
+                    type: 'input_audio',
+                    audio: base64Audio
+                  }
+                ]
+              }
+            })
+          )
+
+          console.log('[LLM] Sent prompt and audio data')
+
+          // 触发回复生成
+          ws.send(JSON.stringify({ type: 'response.create' }))
+          console.log('[LLM] Waiting for response...')
+          isProcessing = true
         })
 
-        request.on('error', (error) => reject(error))
-        request.write(JSON.stringify(requestBody))
-        request.end()
+        ws.on('message', (data: WebSocket.Data) => {
+          try {
+            const message = JSON.parse(data.toString())
+            const eventType = message.type
+
+            // 错误处理
+            if (eventType === 'error') {
+              console.error('[LLM] Server error:', message.error.message)
+              ws.close()
+              reject(new Error(message.error.message))
+              return
+            }
+
+            // 实时接收文本增量
+            if (eventType === 'response.text.delta') {
+              responseText += message.delta
+            }
+
+            // 响应结束
+            if (eventType === 'response.done') {
+              console.log('[LLM] Response completed')
+              ws.close()
+              resolve(responseText || '未能获取到分析结果')
+            }
+          } catch (err) {
+            console.error('[LLM] Message parsing error:', err)
+          }
+        })
+
+        ws.on('error', (error) => {
+          console.error('[LLM] WebSocket error:', error)
+          if (isProcessing) {
+            reject(error)
+          }
+        })
+
+        ws.on('close', () => {
+          console.log('[LLM] WebSocket closed')
+          if (isProcessing && !responseText) {
+            reject(new Error('Connection closed without response'))
+          }
+        })
+
+        // 设置超时
+        setTimeout(() => {
+          if (isProcessing && !responseText) {
+            ws.close()
+            reject(new Error('Request timeout'))
+          }
+        }, 60000) // 60秒超时
       })
-
-      // 提取返回的文本内容
-      const content = result.output?.choices?.[0]?.message?.content?.[0]?.text
-
-      if (!content) {
-        throw new Error('Invalid response format from LLM API')
-      }
-
-      console.log(
-        `[LLM] Analysis complete. Tokens used: ${result.usage?.input_tokens}/${result.usage?.output_tokens}`
-      )
-
-      return content
     } catch (error) {
-      console.error('[LLM] Failed to analyze audio:', error)
+      console.error('[LLM] Analysis error:', error)
       throw error
     }
   }

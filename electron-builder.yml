@@ -9,8 +9,16 @@ files:
   - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
-asarUnpack:
-  - resources/**
+  - '!resources'
+extraResources:
+  - from: resources/bin
+    to: bin
+  - from: resources/models
+    to: models
+  - from: resources/espeak-ng-data
+    to: espeak-ng-data
+  - from: resources/courses
+    to: courses
 win:
   executableName: speech-train-app
 nsis:
@@ -41,5 +49,3 @@ npmRebuild: false
 publish:
   provider: generic
   url: https://example.com/auto-updates
-electronDownload:
-  mirror: https://npmmirror.com/mirrors/electron/
