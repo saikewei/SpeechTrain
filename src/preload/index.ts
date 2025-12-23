@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
+import { SettingsData } from '../shared/types'
 
 // Custom APIs for renderer
 const api = {
@@ -17,7 +18,11 @@ const api = {
   ttsIsConfigured: (): Promise<boolean> => ipcRenderer.invoke('tts-is-configured'),
   // LLM 音频分析
   llmAnalyzeAudio: (audioBuffer: number[], prompt: string): Promise<string> =>
-    ipcRenderer.invoke('llm-analyze-audio', audioBuffer, prompt)
+    ipcRenderer.invoke('llm-analyze-audio', audioBuffer, prompt),
+  // Settings APIs
+  getSettings: (): Promise<SettingsData> => ipcRenderer.invoke('get-settings'),
+  updateSettings: (newSettings: Partial<SettingsData>): Promise<void> =>
+    ipcRenderer.invoke('update-settings', newSettings)
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

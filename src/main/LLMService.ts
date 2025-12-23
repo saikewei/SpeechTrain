@@ -1,24 +1,16 @@
-import { config } from 'dotenv'
 import WebSocket from 'ws'
 import ffmpeg from 'fluent-ffmpeg'
 import { Readable } from 'stream'
-
-config()
+import { settings } from './SettingsService'
 
 class LLMService {
-  private apiKey: string
+  private apiKey(): string {
+    return settings.getSettings().DASHSCOPE_API_KEY || ''
+  }
   private baseUrl: string
 
   constructor() {
-    // 从环境变量读取 API 密钥
-    this.apiKey = process.env.DASHSCOPE_API_KEY || ''
     this.baseUrl = 'wss://sg.uiuiapi.com/v1/realtime?model=gpt-4o-realtime-preview'
-
-    if (!this.apiKey) {
-      console.warn(
-        '[LLM] Warning: DASHSCOPE_API_KEY is not set. Audio analysis functionality will be disabled.'
-      )
-    }
   }
 
   /**
@@ -77,7 +69,7 @@ class LLMService {
       return new Promise((resolve, reject) => {
         const ws = new WebSocket(this.baseUrl, {
           headers: {
-            Authorization: `Bearer ${this.apiKey}`,
+            Authorization: `Bearer ${this.apiKey()}`,
             'OpenAI-Beta': 'realtime=v1'
           }
         })
@@ -200,7 +192,7 @@ class LLMService {
    * 检查 API 密钥是否已配置
    */
   isConfigured(): boolean {
-    return !!this.apiKey
+    return !!this.apiKey()
   }
 }
 

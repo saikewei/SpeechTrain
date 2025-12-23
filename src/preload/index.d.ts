@@ -1,6 +1,7 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import { Course, CourseSummary } from '../shared/types'
 import { AnalysisResult } from '../shared/types'
+import { SettingsData } from '../shared/types'
 
 declare global {
   interface Window {
@@ -23,6 +24,11 @@ declare global {
 
       // LLM 音频分析
       llmAnalyzeAudio: (audioBuffer: number[], prompt: string) => Promise<string>
+
+      // 获取设置
+      getSettings: () => Promise<SettingsData>
+      // 更新设置
+      updateSettings: (newSettings: Partial<SettingsData>) => Promise<void>
     }
   }
 }

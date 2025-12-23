@@ -26,3 +26,9 @@ export interface AnalysisResult {
     phonemes: Array<{ ipa: string; score: number; is_good: boolean }>
   }>
 }
+
+export interface SettingsData {
+  AZURE_TTS_KEY: string
+  AZURE_TTS_REGION: string
+  DASHSCOPE_API_KEY: string
+}

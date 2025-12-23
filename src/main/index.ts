@@ -6,6 +6,8 @@ import { loadCourses } from './courseService'
 import { speechService } from './SpeechService'
 import { ttsService } from './TTSService'
 import { llmService } from './LLMService'
+import { settings } from './SettingsService'
+import { type SettingsData } from '../shared/types'
 
 app.commandLine.appendSwitch('no-sandbox')
 // 定义两个窗口变量
@@ -108,6 +110,14 @@ app.whenReady().then(async () => {
 
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
+
+  ipcMain.handle('get-settings', () => {
+    return settings.getSettings()
+  })
+
+  ipcMain.handle('update-settings', (_event, newSettings: Partial<SettingsData>) => {
+    settings.updateSettings(newSettings)
+  })
 
   // 获取课程列表 (只返回元数据，不返回具体 content 以减少流量)
   ipcMain.handle('get-course-list', () => {

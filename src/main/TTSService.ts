@@ -1,6 +1,4 @@
-import { config } from 'dotenv'
-
-config()
+import { settings } from './SettingsService'
 
 // TTS 语音配置映射
 interface VoiceConfig {
@@ -74,21 +72,16 @@ const VOICE_MAP: Record<string, VoiceConfig> = {
 }
 
 class TTSService {
-  private apiKey: string
-  private region: string
+  private apiKey(): string {
+    return settings.getSettings().AZURE_TTS_KEY || ''
+  }
+  private region(): string {
+    return settings.getSettings().AZURE_TTS_REGION || 'eastasia'
+  }
   private baseUrl: string
 
   constructor() {
-    // 从环境变量读取 API 密钥
-    this.apiKey = process.env.AZURE_TTS_API_KEY || ''
-    this.region = process.env.AZURE_TTS_REGION || 'eastasia'
-    this.baseUrl = `https://${this.region}.tts.speech.microsoft.com/cognitiveservices/v1`
-
-    if (!this.apiKey) {
-      console.warn(
-        '[TTS] Warning: AZURE_TTS_API_KEY is not set. TTS functionality will be disabled.'
-      )
-    }
+    this.baseUrl = `https://${this.region()}.tts.speech.microsoft.com/cognitiveservices/v1`
   }
 
   /**
@@ -153,7 +146,7 @@ class TTSService {
       const response = await fetch(this.baseUrl, {
         method: 'POST',
         headers: {
-          'Ocp-Apim-Subscription-Key': this.apiKey,
+          'Ocp-Apim-Subscription-Key': this.apiKey(),
           'Content-Type': 'application/ssml+xml',
           'X-Microsoft-OutputFormat': 'riff-16khz-16bit-mono-pcm',
           'User-Agent': 'SpeechTrainApp/1.0'
