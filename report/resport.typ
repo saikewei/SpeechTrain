@@ -194,6 +194,7 @@ The primary function of the system is the deterministic scoring of user speech. 
 
 The workflow begins when the user records audio in the frontend. The data is transmitted to the main process as a raw Float32Array (PCM data) to avoid disk I/O overhead. Inside the C++ backend, the audio is preprocessed to match the model's requirements: it is mixed to mono, resampled to 16,000Hz, and normalized.
 
+
 ```ts
 // SpeechService.ts
 // Efficient memory transfer of PCM data to C++ backend
@@ -208,6 +209,11 @@ public analyzeRaw(
     return result
 }
 ```
+
+#figure(
+  image("QQ20251225-012609.png", width: 70%),
+  caption: [Audio Record UI]
+  )
 
 === Acoustic Inference (Wav2Vec 2.0)
 
@@ -287,6 +293,11 @@ if (count > 0) {
 detail.is_good = (detail.score > THRESHOLD_GOOD);
 ```
 
+#figure(
+  image("QQ20251225-012644.png", width: 80%),
+  caption: [Phoneme-level GOP Scoring Output]
+)
+
 == AI Coaching: Multimodal LLM Integration
 
 While GOP provides objective accuracy, _GPT-4o-realtime-preview_ is used for qualitative coaching. The LLMService manages a WebSocket connection to OpenAI, sending the user's audio to be analyzed by a virtual coach.
@@ -322,6 +333,11 @@ ws.on('open', () => {
   ws.send(JSON.stringify({ type: 'response.create' }));
 });
 ```
+
+#figure(
+  image("QQ20251225-012650.png", width: 70%),
+  caption: [LLM Coaching Feedback Output]
+)
 
 This integration allows the application to capture nuances such as improper word stress or flat intonation—features that are often missed by traditional ASR systems but are essential for mastering a second language.
 
